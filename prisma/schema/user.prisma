@@ -10,6 +10,7 @@ model User {
   authProvider  AuthProvider @default(CREADENTIAL)
   imagePublicId String?
   imageURL      String?
+  emailVerified Boolean      @default(false)
   role          Role         @default(USER)
   status        UserStatus   @default(ACTIVE)
 
