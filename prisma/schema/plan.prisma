@@ -1,0 +1,17 @@
+model Plan {
+  id String @id @default(uuid())
+
+  name  PlanType @unique
+  price Decimal? @db.Decimal(10, 2)
+
+  tokenLimitToday Int
+  tokenLimitMonth Int
+  status          Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}

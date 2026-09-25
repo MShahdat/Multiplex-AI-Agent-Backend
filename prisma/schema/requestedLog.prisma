@@ -1,0 +1,19 @@
+model RequestedLog {
+  id String @id @default(uuid())
+
+  endpoint   String
+  method     String
+  statusCode Int
+  latencyMs  Int
+  tokensUsed Int?   @default(0)
+
+  createdAt DateTime @default(now())
+
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, createdAt])
+  @@index([endpoint, createdAt])
+  @@map("request_logs")
+}

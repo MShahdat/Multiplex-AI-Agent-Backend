@@ -1,0 +1,24 @@
+model Payment {
+  id String @id @default(uuid())
+
+  amount   Decimal       @db.Decimal(10, 2)
+  method   PaymentMethod
+  currency String
+  status   PaymentStatus
+  paidAt   DateTime      @default(now())
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  bKashPaymentId        String? @unique
+  transectionId         String? @unique
+  payerReference        String?
+  merchantInvoiceNumber String? @unique
+
+  createdAt DateTime @default(now())
+
+  subscriptionId String       @unique
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}

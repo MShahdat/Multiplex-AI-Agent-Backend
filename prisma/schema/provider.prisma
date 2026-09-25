@@ -1,0 +1,30 @@
+model AiProvider {
+  id String @id @default(uuid())
+
+  name    String
+  type    ProviderType
+  baseUrl String?
+  model   String
+
+  encryptedApiKey String
+  iv              String
+  authTag         String
+
+  isEnabled Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  lastHealthCheck DateTime?
+  isHealthy       Boolean   @default(true)
+
+  maxTokensPerRequest  Int?
+  costPerMillionTokens Decimal? @db.Decimal(10, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  // requestLogs RequestLog[]
+
+  @@index([type, isEnabled])
+  @@map("ai_providers")
+}

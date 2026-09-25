@@ -1,0 +1,56 @@
+enum Role {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum AuthProvider {
+  CREADENTIAL
+  GOOGLE
+  GITHUB
+  FACEBOOK
+}
+
+enum PlanType {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+enum SubscriptionType {
+  MONTHLY
+  HEALF_YEARLY
+  YEARLY
+}
+
+enum PaymentMethod {
+  CARD
+  BKASH
+}
+
+enum ProviderType {
+  OPENAI
+  CLAUDE
+}
+
+enum MessageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentStatus {
+  PAID
+  FAILED
+  CANCELLED
+}
