@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { prisma } from '../../lib/prisma.js';
 import bcrypt from 'bcrypt';
@@ -13,7 +14,11 @@ import path from 'path';
 import ejs from 'ejs';
 import { transporter } from '../../lib/nodemailer.js';
 import { Role } from '../../../../generated/prisma/enums.js';
-import { EmailVerifyDto, RegisterUserDto } from './auth.dto.js';
+import { EmailVerifyDto, LoginUserDto, RegisterUserDto } from './auth.dto.js';
+import { jwtUtils } from '../../utils/jwt.js';
+import { UserStatus } from '../../../../generated/prisma/enums.js';
+import type { JwtPayload, SignOptions } from 'jsonwebtoken';
+import type { AuthenticatedUser } from '../../interface/index.js';
 
 @Injectable()
 export class AuthService {
@@ -82,9 +87,6 @@ export class AuthService {
       html,
     });
 
-    return {
-      message: 'OTP send successfully',
-    };
   }
 
   //& EMAIL VERIFY AND ACCOUNT CREATE
@@ -136,6 +138,179 @@ export class AuthService {
 
     await redisClient.del([otpKey, registerKey]);
 
-    return user;
+    const jwtPayload = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_access_secret,
+      config.jwt_access_expires_in as SignOptions,
+    );
+
+    const refreshToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_refresh_secret,
+      config.jwt_refresh_expires_in as SignOptions,
+    );
+
+
+    return {
+      accessToken,
+      refreshToken,
+      user
+    };
   }
+
+
+  //& LOGIN USER
+  async loginUser(payload: LoginUserDto) {
+    const { password } = payload;
+    const email = payload.email.trim().toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found!')
+    }
+
+    if (user.status === UserStatus.BLOCKED) {
+      throw new BadRequestException("User is blocked");
+    }
+
+    if (user.password === null) {
+      throw new BadRequestException(
+        "User already has an account with google. please try to login with google",
+      );
+    }
+
+    if (user.isDeleted || user.status === "DELETED") {
+      throw new BadRequestException('User alredy deleted!')
+    }
+
+    const isPasswordMatched = await bcrypt.compare(
+      password,
+      user.password as string,
+    );
+
+    if (!isPasswordMatched) {
+      throw new BadRequestException('Invalid Creadential')
+
+    }
+
+    const jwtPayload = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_access_secret,
+      config.jwt_access_expires_in as SignOptions,
+    );
+
+    const refreshToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_refresh_secret,
+      config.jwt_refresh_expires_in as SignOptions,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  };
+
+
+  //& GET ME
+  async getMe(user: AuthenticatedUser) {
+
+    const isUser = await prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
+      omit: {
+        password: true,
+      },
+    });
+
+    if (!isUser) {
+      throw new NotFoundException('User Not Found!')
+    }
+
+    return isUser
+  };
+
+  //& CREATE ACCESS TOKEN
+  async refreshToken(token: string) {
+
+    const verifiedRefreshToken = jwtUtils.verifyToken(
+      token,
+      config.jwt_refresh_secret,
+    );
+
+    if (
+      !verifiedRefreshToken.success ||
+      !verifiedRefreshToken.data ||
+      typeof verifiedRefreshToken.data === 'string'
+    ) {
+      throw new UnauthorizedException(
+        config.node_env === "development"
+          ? verifiedRefreshToken.error
+          : "Invalid refresh token",
+      );
+    }
+
+    const data = verifiedRefreshToken.data as JwtPayload;
+    if (typeof data.id !== 'string') {
+      throw new UnauthorizedException('Invalid refresh token payload');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: data.id },
+    });
+
+    if (!user || user.isDeleted || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException(
+        "User is inactive or not found",
+      );
+    }
+
+    const jwtPayload = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_access_secret,
+      config.jwt_access_expires_in as SignOptions,
+    );
+
+    const refreshToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_refresh_secret,
+      config.jwt_refresh_expires_in as SignOptions,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  };
 }

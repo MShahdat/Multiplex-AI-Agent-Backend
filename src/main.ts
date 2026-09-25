@@ -4,23 +4,35 @@ import config from './app/config/index.js';
 import { prisma } from './app/lib/prisma.js';
 import { redisClient } from './app/lib/redis.js';
 import { ValidationPipe } from '@nestjs/common';
+import { ResponseInterceptor } from './app/common/response.interceptor.js';
+import cookieParser from "cookie-parser";
+
 
 const PORT = config.port || 5000;
 
 async function bootstrap() {
   try {
-    redisClient.on('error', (error) => {
-      console.error('Redis client error:', error);
-    });
 
     const app = await NestFactory.create(AppModule);
+
+    app.use(cookieParser());
+
+    app.enableCors({
+      origin: config.frontend_url,
+      credentials: true,
+    });
 
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
+        transform: true
       }),
     );
+
+    app.useGlobalInterceptors(
+      new ResponseInterceptor
+    )
 
     await prisma.$connect();
     console.log('Connected to the database successfully.');

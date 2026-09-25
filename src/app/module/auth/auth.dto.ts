@@ -20,3 +20,13 @@ export class EmailVerifyDto {
   @IsNotEmpty()
   otp: string;
 }
+
+
+export class LoginUserDto {
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
