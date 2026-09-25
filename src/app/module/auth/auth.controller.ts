@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { prefix } from '../../utils/global.prefix.js';
 import { AuthService } from './auth.service.js';
-import { EmailVerifyDto, LoginUserDto, RegisterUserDto } from './auth.dto.js';
+import { EmailVerifyDto, ForgotPasswordDto, LoginUserDto, RegisterUserDto, ResetPasswordDto } from './auth.dto.js';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
@@ -85,7 +85,10 @@ export class AuthController {
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
 
     return {
-      data: result.user,
+      data: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken
+      },
       message: "User logged in successfully"
     }
   }
@@ -134,5 +137,29 @@ export class AuthController {
     };
   }
 
+
+  @Post('/forgot-password')
+  async forgotPass(@Body() payload: ForgotPasswordDto) {
+
+    const result = await this.authService.forgotPassword(payload)
+    return {
+      message: "OTP send successfully"
+    }
+  }
+
+
+  @Post('/reset-password')
+  async resetPassword(@Body() payload: ResetPasswordDto) {
+
+    const result = await this.authService.resetPassword(payload)
+
+    return {
+      data: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken
+      },
+      message: "Password updated successfully"
+    }
+  }
 
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -14,7 +15,7 @@ import path from 'path';
 import ejs from 'ejs';
 import { transporter } from '../../lib/nodemailer.js';
 import { Role } from '../../../../generated/prisma/enums.js';
-import { EmailVerifyDto, LoginUserDto, RegisterUserDto } from './auth.dto.js';
+import { EmailVerifyDto, ForgotPasswordDto, LoginUserDto, RegisterUserDto, ResetPasswordDto } from './auth.dto.js';
 import { jwtUtils } from '../../utils/jwt.js';
 import { UserStatus } from '../../../../generated/prisma/enums.js';
 import type { JwtPayload, SignOptions } from 'jsonwebtoken';
@@ -22,6 +23,8 @@ import type { AuthenticatedUser } from '../../interface/index.js';
 
 @Injectable()
 export class AuthService {
+
+
   //& REGISTER USER
   async create(payload: RegisterUserDto) {
     const { name, password } = payload;
@@ -313,4 +316,151 @@ export class AuthService {
       refreshToken,
     };
   };
+
+
+
+  //& FORGOT PASSWORD
+  async forgotPassword(payload: ForgotPasswordDto) {
+    const { email } = payload;
+
+    const isExistUser = await prisma.user.findUnique({
+      where: {
+        email
+      },
+    });
+
+    if (!isExistUser) {
+      throw new NotFoundException("User does not exist");
+    }
+
+    if (isExistUser.status === "BLOCKED") {
+      throw new ForbiddenException("User thas temporary blocked");
+    }
+
+    if (isExistUser.status === UserStatus.DELETED) {
+      throw new ForbiddenException("user has deleted");
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+
+    const expirationTime = 5 * 60;
+    const key = `forgot-password-otp: ${isExistUser.email}`;
+    await redisClient.set(key, otp, {
+      expiration: {
+        type: "EX",
+        value: expirationTime,
+      },
+    });
+
+    const templatePath = path.join(
+      process.cwd(),
+      "src/app/template/forgot.password.opt.ejs",
+    );
+
+    const templateData = {
+      name: isExistUser.name,
+      otp,
+      expire: expirationTime / 60,
+      appName: config.app_name
+    };
+
+    const html = await ejs.renderFile(templatePath, templateData);
+
+    await transporter.sendMail({
+      from: config.smtp_sender,
+      to: isExistUser.email,
+      subject: "Forgot Password",
+      html,
+    });
+  };
+
+
+
+  //& RESET PASSWORD
+  async resetPassword(payload: ResetPasswordDto) {
+    const { email, otp, newPassword } = payload;
+
+    const isExistUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!isExistUser) {
+      throw new NotFoundException("User does not exist");
+    }
+
+    if (isExistUser.status === "BLOCKED") {
+      throw new ForbiddenException("User thas temporary blocked");
+    }
+
+    if (isExistUser.status === UserStatus.DELETED) {
+      throw new BadRequestException("user has deleted");
+    }
+
+    const key = `forgot-password-otp: ${isExistUser.email}`;
+    const redisOTP = await redisClient.get(key);
+
+    if (!redisOTP) {
+      throw new BadRequestException("Invalid OTP");
+    }
+
+    if (redisOTP !== otp) {
+      throw new BadRequestException("OTP does not match");
+    }
+
+    const hashPass = await bcrypt.hash(
+      newPassword,
+      Number(config.bcrypt_salt_rounds),
+    );
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        password: hashPass,
+      },
+    });
+
+    const templateData = {
+      name: isExistUser.name,
+      appName: config.app_name
+    };
+
+    const html = await ejs.renderFile(
+      path.join(process.cwd(), "src/app/template/reset.password.ejs"),
+      templateData,
+    );
+
+    await transporter.sendMail({
+      from: config.smtp_sender,
+      to: isExistUser.email,
+      subject: "Reset Password",
+      html,
+    });
+
+    await redisClient.del(key);
+
+    const jwtPayload = {
+      id: isExistUser.id,
+      name: isExistUser.name,
+      email: isExistUser.email,
+      role: isExistUser.role,
+    };
+
+    const accessToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_access_secret,
+      config.jwt_access_expires_in as SignOptions,
+    );
+
+    const refreshToken = jwtUtils.createToken(
+      jwtPayload,
+      config.jwt_refresh_secret,
+      config.jwt_refresh_expires_in as SignOptions,
+    );
+
+    return {
+      accessToken,
+      refreshToken
+    }
+  };
+
 }

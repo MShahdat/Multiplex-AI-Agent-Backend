@@ -4,7 +4,7 @@ import config from './app/config/index.js';
 import { prisma } from './app/lib/prisma.js';
 import { redisClient } from './app/lib/redis.js';
 import { ValidationPipe } from '@nestjs/common';
-import { ResponseInterceptor } from './app/common/response.interceptor.js';
+import { ResponseInterceptor } from './app/common/interceptors/response.interceptor.js';
 import cookieParser from "cookie-parser";
 
 
