@@ -36,7 +36,9 @@ const config = {
   tester_admin_email: process.env.TESTER_ADMIN_EMAIL!,
   tester_admin_password: process.env.TESTER_ADMIN_PASSWORD!,
 
-
+  google_client_id: process.env.GOOGLE_CLIENT_ID!,
+  google_client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+  google_callback_uri: process.env.GOOGLE_CALLBACK_URI!,
 
 };
 

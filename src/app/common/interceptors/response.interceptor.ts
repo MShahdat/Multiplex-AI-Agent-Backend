@@ -7,7 +7,7 @@ import { map } from 'rxjs/operators'
 export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
-      map(<T>(res: { message: string, data: T }) => ({
+      map(<T>(res: { message?: string, data: T }) => ({
         success: true,
         message: res.message,
         data: res.data

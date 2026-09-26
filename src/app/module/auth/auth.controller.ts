@@ -18,6 +18,7 @@ import type { AuthenticatedUser } from '../../interface/index.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../../../generated/prisma/enums.js';
+import config from '../../config/index.js';
 
 
 @Controller(`${prefix}/auth`)
@@ -167,5 +168,31 @@ export class AuthController {
       message: "Password updated successfully"
     }
   }
+
+
+  @Get('/google')
+  googleLogin() { }
+
+  @Get('/google/callback')
+  async googleCallback(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Res() res: Response,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('Google authentication failed');
+    }
+
+    const tokens = await this.authService.loginWithGoogle(req.user);
+    this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
+    return {
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      },
+      message: "User Logged in successfully"
+    }
+  }
+
 
 }

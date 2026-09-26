@@ -6,6 +6,7 @@ import { redisClient } from './app/lib/redis.js';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './app/common/interceptors/response.interceptor.js';
 import cookieParser from "cookie-parser";
+import passport from 'passport';
 import { seedTesterAdmin } from './app/utils/seed.js';
 import { deleteUserFromDB } from './app/lib/cron.js';
 
@@ -18,6 +19,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     app.use(cookieParser());
+    app.use(passport.initialize());
 
     app.enableCors({
       origin: config.frontend_url,
