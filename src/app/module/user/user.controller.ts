@@ -4,7 +4,9 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  Patch
+  Patch,
+  Body,
+  Param
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
@@ -32,5 +34,20 @@ export class UserController {
       data,
       message: 'Profile image uploaded successfully',
     };
+  }
+
+  @Patch('/delete/:id')
+  @UseGuards(AuthGuard)
+  async deleteUser(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string
+  ) {
+
+    await this.userService.deleteUser(id)
+
+    return {
+      message: "User soft deleted successfully",
+      data: null
+    }
   }
 }

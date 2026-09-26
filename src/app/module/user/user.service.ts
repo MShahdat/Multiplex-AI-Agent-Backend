@@ -21,6 +21,7 @@ export class UserService {
     @Inject(CLOUDINARY) private readonly cloudinaryClient: typeof cloudinary,
   ) { }
 
+
   async uploadFile(user: AuthenticatedUser, file: ImageUploadFile) {
 
     if (!file) {
@@ -102,5 +103,38 @@ export class UserService {
     )
 
     return transactionRes
+  }
+
+
+  async deleteUser(deleteUserId: string) {
+
+    const isUser = await prisma.user.findUnique({
+      where: {
+        id: deleteUserId
+      }
+    })
+
+    if (!isUser) {
+      throw new NotFoundException('User not found!')
+    }
+
+    if (isUser.status === UserStatus.BLOCKED) {
+      throw new BadRequestException('User is temporary blocked. Please unblocked first')
+    }
+
+    if (isUser.status === UserStatus.DELETED || isUser.isDeleted) {
+      throw new BadRequestException('User already deleted')
+    }
+
+    await prisma.user.update({
+      where: {
+        id: isUser.id
+      },
+      data: {
+        status: UserStatus.DELETED,
+        isDeleted: true,
+        deletedAt: new Date()
+      }
+    })
   }
 }

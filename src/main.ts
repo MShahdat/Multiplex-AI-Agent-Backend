@@ -6,6 +6,8 @@ import { redisClient } from './app/lib/redis.js';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './app/common/interceptors/response.interceptor.js';
 import cookieParser from "cookie-parser";
+import { seedTesterAdmin } from './app/utils/seed.js';
+import { deleteUserFromDB } from './app/lib/cron.js';
 
 
 const PORT = config.port || 5000;
@@ -39,6 +41,10 @@ async function bootstrap() {
 
     await redisClient.connect();
     console.log('Connected to Redis successfully.');
+
+    await seedTesterAdmin()
+
+    await deleteUserFromDB()
 
     await app.listen(PORT, () => {
       console.log(`server is running port ${PORT}`);
