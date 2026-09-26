@@ -95,7 +95,9 @@ export class AuthController {
 
   @Get('/me')
   @UseGuards(AuthGuard)
-  async getMe(@CurrentUser() user: AuthenticatedUser) {
+  async getMe(
+    @CurrentUser() user: AuthenticatedUser
+  ) {
     const result = await this.authService.getMe(user)
 
     return {
@@ -139,7 +141,9 @@ export class AuthController {
 
 
   @Post('/forgot-password')
-  async forgotPass(@Body() payload: ForgotPasswordDto) {
+  async forgotPass(
+    @Body() payload: ForgotPasswordDto
+  ) {
 
     const result = await this.authService.forgotPassword(payload)
     return {
@@ -149,7 +153,9 @@ export class AuthController {
 
 
   @Post('/reset-password')
-  async resetPassword(@Body() payload: ResetPasswordDto) {
+  async resetPassword(
+    @Body() payload: ResetPasswordDto
+  ) {
 
     const result = await this.authService.resetPassword(payload)
 
