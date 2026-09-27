@@ -2,7 +2,7 @@ model Message {
   id String @id @default(uuid())
 
   prompt  String        @db.Text
-  content String        @db.Text
+  content String?       @db.Text
   status  MessageStatus @default(PENDING)
 
   promptTokens     Int?
@@ -16,11 +16,13 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  providerId     String
-  provider       AiProvider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  requestedLog   RequestedLog? @relation(fields: [requestedLogId], references: [id])
+  providerId String?
+  provider   AiProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  requestedLog   RequestLog? @relation(fields: [requestedLogId], references: [id])
   requestedLogId String?
 
   @@index([conversationId, createdAt])
+  @@index([providerId])
   @@map("messages")
 }

@@ -45,9 +45,9 @@ export class AuthController {
   }
 
   @Post('/register')
-  create(@Body() payload: RegisterUserDto) {
+  async create(@Body() payload: RegisterUserDto) {
 
-    const result = this.authService.create(payload);
+    const result = await this.authService.create(payload);
     return {
       data: result,
       message: 'OTP send successfully',
@@ -158,14 +158,10 @@ export class AuthController {
     @Body() payload: ResetPasswordDto
   ) {
 
-    const result = await this.authService.resetPassword(payload)
+    await this.authService.resetPassword(payload)
 
     return {
-      data: {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken
-      },
-      message: "Password updated successfully"
+      message: "Password updated successfully, Please login"
     }
   }
 

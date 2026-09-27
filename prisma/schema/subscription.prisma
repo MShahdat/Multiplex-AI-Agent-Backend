@@ -19,7 +19,7 @@ model Subscription {
   planId String
   plan   Plan   @relation(fields: [planId], references: [id])
 
-  payment Payment?
+  payment Payment[]
 
   @@index([status])
   @@map("subscriptions")

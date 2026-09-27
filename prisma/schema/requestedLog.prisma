@@ -1,19 +1,28 @@
-model RequestedLog {
+model RequestLog {
   id String @id @default(uuid())
 
   endpoint   String
   method     String
   statusCode Int
   latencyMs  Int
-  tokensUsed Int?   @default(0)
+
+  promptTokens     Int?
+  completionTokens Int?
+
+  tokensUsed Int? @default(0)
 
   createdAt DateTime @default(now())
 
-  userId   String
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages Message[]
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  providerId String?
+  provider   AiProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  message Message[]
 
   @@index([userId, createdAt])
   @@index([endpoint, createdAt])
+  @@index([providerId])
   @@map("request_logs")
 }

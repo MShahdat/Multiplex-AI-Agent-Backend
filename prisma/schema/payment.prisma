@@ -17,8 +17,9 @@ model Payment {
 
   createdAt DateTime @default(now())
 
-  subscriptionId String       @unique
+  subscriptionId String
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
+  @@index([subscriptionId, paidAt])
   @@map("payments")
 }

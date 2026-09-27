@@ -21,8 +21,8 @@ model User {
   updatedAt DateTime @updatedAt
 
   subscription Subscription[]
-  conversion   Conversation[]
-  requestedLog RequestedLog[]
+  conversation Conversation[]
+  requestedLog RequestLog[]
 
   @@map("users")
 }

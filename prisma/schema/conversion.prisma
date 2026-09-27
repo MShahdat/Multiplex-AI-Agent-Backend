@@ -11,6 +11,9 @@ model Conversation {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  providerId String?
+  provider   AiProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull) // NEW
+
   messages Message[]
 
   @@index([userId, updatedAt])

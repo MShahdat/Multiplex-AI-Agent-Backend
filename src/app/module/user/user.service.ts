@@ -88,7 +88,7 @@ export class UserService {
         });
 
         if (uploadedImage && isUser.imageURL && isUser.imagePublicId) {
-          cloudinary.uploader.destroy(isUser.imagePublicId, {
+          await cloudinary.uploader.destroy(isUser.imagePublicId, {
             invalidate: true
           })
           console.log('previous file deleted')

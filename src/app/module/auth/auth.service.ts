@@ -46,7 +46,7 @@ export class AuthService {
 
     const expirationTime = 5 * 60;
     const otp = crypto.randomInt(100000, 1000000);
-    const otpKey = `user-register-otp: ${email}`;
+    const otpKey = `user-register-otp:${email}`;
 
     await redisClient.set(otpKey, otp, {
       expiration: {
@@ -55,7 +55,7 @@ export class AuthService {
       },
     });
 
-    const registerKey = `user-register-data: ${email}`;
+    const registerKey = `user-register-data:${email}`;
     const registerValue = {
       name,
       email,
@@ -97,10 +97,10 @@ export class AuthService {
     const email = payload.email.trim().toLowerCase();
     const { otp } = payload;
 
-    const registerKey = `user-register-data: ${email}`;
+    const registerKey = `user-register-data:${email}`;
     const redisData = await redisClient.get(registerKey);
 
-    const otpKey = `user-register-otp: ${email}`;
+    const otpKey = `user-register-otp:${email}`;
     const redisOTP = await redisClient.get(otpKey);
 
     if (!redisData || !redisOTP) {
@@ -368,7 +368,7 @@ export class AuthService {
     const otp = crypto.randomInt(100000, 1000000).toString();
 
     const expirationTime = 5 * 60;
-    const key = `forgot-password-otp: ${isExistUser.email}`;
+    const key = `forgot-password-otp:${isExistUser.email}`;
     await redisClient.set(key, otp, {
       expiration: {
         type: "EX",
@@ -420,7 +420,7 @@ export class AuthService {
       throw new BadRequestException("user has deleted");
     }
 
-    const key = `forgot-password-otp: ${isExistUser.email}`;
+    const key = `forgot-password-otp:${isExistUser.email}`;
     const redisOTP = await redisClient.get(key);
 
     if (!redisOTP) {
@@ -461,30 +461,6 @@ export class AuthService {
     });
 
     await redisClient.del(key);
-
-    const jwtPayload = {
-      id: isExistUser.id,
-      name: isExistUser.name,
-      email: isExistUser.email,
-      role: isExistUser.role,
-    };
-
-    const accessToken = jwtUtils.createToken(
-      jwtPayload,
-      config.jwt_access_secret,
-      config.jwt_access_expires_in as SignOptions,
-    );
-
-    const refreshToken = jwtUtils.createToken(
-      jwtPayload,
-      config.jwt_refresh_secret,
-      config.jwt_refresh_expires_in as SignOptions,
-    );
-
-    return {
-      accessToken,
-      refreshToken
-    }
   };
 
 }

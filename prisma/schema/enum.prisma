@@ -39,8 +39,8 @@ enum PaymentMethod {
 }
 
 enum ProviderType {
-  OPENAI
-  CLAUDE
+  GROQ
+  ANTHROPIC
 }
 
 enum MessageStatus {
