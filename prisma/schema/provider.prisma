@@ -4,7 +4,7 @@ model AiProvider {
   name    String
   type    ProviderType
   baseUrl String?
-  model   String
+  model   String       @unique
   tier    PlanType     @default(FREE)
 
   encryptedApiKey String
@@ -27,7 +27,6 @@ model AiProvider {
   conversion  Conversation[]
   requestLogs RequestLog[]
 
-  @@unique([type, isDefault])
   @@index([type, isEnabled])
   @@map("ai_providers")
 }

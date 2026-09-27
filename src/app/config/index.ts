@@ -40,7 +40,8 @@ const config = {
   google_client_secret: process.env.GOOGLE_CLIENT_SECRET!,
   google_callback_uri: process.env.GOOGLE_CALLBACK_URI!,
 
-  groq_api_key: process.env.GROQ_API_KEY!
+  groq_api_key: process.env.GROQ_API_KEY!,
+  encryption_key: process.env.ENCRYPTION_KEY!
 };
 
 export default config;

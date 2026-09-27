@@ -10,7 +10,7 @@ enum UserStatus {
 }
 
 enum AuthProvider {
-  CREADENTIAL
+  CREDENTIAL
   GOOGLE
   GITHUB
   FACEBOOK
@@ -29,7 +29,7 @@ enum SubscriptionStatus {
 
 enum SubscriptionType {
   MONTHLY
-  HEALF_YEARLY
+  HALF_YEARLY
   YEARLY
 }
 

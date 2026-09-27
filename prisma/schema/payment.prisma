@@ -11,7 +11,7 @@ model Payment {
   stripeSubscriptionId String? @unique
 
   bKashPaymentId        String? @unique
-  transectionId         String? @unique
+  transactionId         String? @unique
   payerReference        String?
   merchantInvoiceNumber String? @unique
 

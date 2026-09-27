@@ -7,7 +7,7 @@ model User {
   googleId      String?      @unique
   facebookId    String?      @unique
   githubId      String?      @unique
-  authProvider  AuthProvider @default(CREADENTIAL)
+  authProvider  AuthProvider @default(CREDENTIAL)
   imagePublicId String?
   imageURL      String?
   emailVerified Boolean      @default(false)
