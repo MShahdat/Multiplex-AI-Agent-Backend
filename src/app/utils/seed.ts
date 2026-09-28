@@ -133,13 +133,12 @@ export const providerTem = async () => {
   const availableProviders = await prisma.aiProvider.findMany();
 
   const qwen3827b = availableProviders.find((p: any) => p.model === 'qwen/qwen3.8-27b')
-  const llama222 = availableProviders.find((p: any) => p.model === 'meta-llama/llama-prompt-guard-2-22m');
-  const llama286 = availableProviders.find((p: any) => p.model === 'meta-llama/llama-prompt-guard-2-86m');
+
   const openai_gpt_120b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-120b');
   const openai_gpt_20b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-20b');
   const openai_gpt_safeguard_20b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-safeguard-20b');
 
-  if (!qwen3827b || !llama222 || !llama286 || !openai_gpt_120b || !openai_gpt_20b || !openai_gpt_safeguard_20b) {
+  if (!qwen3827b || !openai_gpt_120b || !openai_gpt_20b || !openai_gpt_safeguard_20b) {
     throw new Error('Missing required AI providers for free plan limits.');
   }
 
@@ -152,24 +151,6 @@ export const providerTem = async () => {
       requestPerMin: 30,
       tokenPerDay: 200000,
       tokenPerMin: 8000,
-    },
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: llama222.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 14400,
-      requestPerMin: 30,
-      tokenPerDay: 50000,
-      tokenPerMin: 15000,
-    },
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: llama286.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 14400,
-      requestPerMin: 30,
-      tokenPerDay: 50000,
-      tokenPerMin: 15000,
     },
     {
       planTemplateId: freePlan.id,
