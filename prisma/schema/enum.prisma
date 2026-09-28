@@ -50,6 +50,7 @@ enum MessageStatus {
 }
 
 enum PaymentStatus {
+  PENDING
   PAID
   FAILED
   CANCELLED

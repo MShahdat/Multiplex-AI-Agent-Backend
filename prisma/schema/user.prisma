@@ -22,7 +22,7 @@ model User {
 
   plan         Plan?
   requestsLog  RequestsLog[]
-  subscription Subscription?
+  subscription Subscription[]
   conversation Conversation[]
 
   @@map("users")

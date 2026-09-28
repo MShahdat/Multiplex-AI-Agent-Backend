@@ -1,6 +1,6 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { prefix } from '../../utils/global.prefix.js';
-import { MsgPromptDto } from './message.dto.js';
+import { MsgPromptDto, UpdateTitleDto } from './message.dto.js';
 import { MessageService } from './message.service.js';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
@@ -27,4 +27,87 @@ export class MessageController {
       message: "success"
     };
   }
+
+
+  @Get('/my-conversation')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  async getMyConversation(
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+
+    const res = await this.messageService.getMyConversation(user)
+
+    return {
+      data: res,
+      message: 'My conversation retrive successfully'
+    }
+  }
+
+
+  @Get('/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  async getSingleConversation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string
+  ) {
+    const res = await this.messageService.getSingleConversation(id, user);
+    return {
+      data: res,
+      message: "Conversation retrive Successfully"
+    };
+  }
+
+
+
+  @Put('/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  async updateTitle(
+    @Body() payload: UpdateTitleDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string
+  ) {
+    const res = await this.messageService.updateTitle(payload, id, user);
+    return {
+      data: res,
+      message: "Title updated Successfully"
+    };
+  }
+
+
+
+  @Patch('/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  async archieve(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string
+  ) {
+    const res = await this.messageService.archive(id, user);
+    return {
+      data: null,
+      message: "Conversation archieved Successfully"
+    };
+  }
+
+
+  @Patch('/remove/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  async removeArchieve(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string
+  ) {
+    const res = await this.messageService.removeArchive(id, user);
+    return {
+      data: null,
+      message: "Conversation undo from acrchieved Successfully"
+    };
+  }
+
+
+
+
 }

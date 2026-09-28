@@ -1,22 +1,27 @@
 model Subscription {
   id String @id @default(uuid())
 
-  status           SubscriptionStatus @default(ACTIVE)
-  currentPeriodEnd DateTime?
-  canceledAt       DateTime?
-  type             SubscriptionType
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  type               SubscriptionType
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  userId String @unique
+  userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   planId String
   plan   Plan   @relation(fields: [planId], references: [id])
 
-  payment Payment[]
+  planTemplateId String
+  planTemplate   PlanTemplate @relation(fields: [planTemplateId], references: [id])
 
-  @@index([status])
+  payment Payment?
+
+  @@index([status, userId])
+  @@index([currentPeriodEnd])
   @@map("subscriptions")
 }

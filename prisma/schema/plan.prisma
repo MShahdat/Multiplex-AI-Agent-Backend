@@ -1,10 +1,11 @@
 model Plan {
   id String @id @default(uuid())
 
-  tokensUserPerMin   Int @default(0)
-  tokensUsedPerDay   Int @default(0)
-  requestsUsedPerMin Int @default(0)
-  requestsUsedPerDay Int @default(0)
+  tokensUsedPerMin   Int      @default(0)
+  tokensUsedPerDay   Int      @default(0)
+  requestsUsedPerMin Int      @default(0)
+  requestsUsedPerDay Int      @default(0)
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

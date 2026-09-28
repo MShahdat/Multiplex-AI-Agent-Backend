@@ -13,3 +13,10 @@ export type ChatRoleMsg = {
   role: 'system' | 'user' | 'assistant';
   content: string
 };
+
+
+
+export class UpdateTitleDto {
+  @IsString() @IsOptional()
+  title?: string
+}

@@ -145,7 +145,8 @@ export class AuthService {
 
         const planTemp = await tx.planTemplate.findUnique({
           where: {
-            type: PlanType.FREE
+            type: PlanType.FREE,
+            code: 'FREE'
           }
         })
 
@@ -173,7 +174,7 @@ export class AuthService {
           data: {
             planTemplateId: planTemp.id,
             userId: user.id,
-            tokensUserPerMin: totals._sum.tokenPerMinute ?? 0,
+            tokensUsedPerMin: totals._sum.tokenPerMinute ?? 0,
             tokensUsedPerDay: totals._sum.tokenPerDay ?? 0,
             requestsUsedPerMin: totals._sum.requestPerMinute ?? 0,
             requestsUsedPerDay: totals._sum.requestPerDay ?? 0,
@@ -318,9 +319,20 @@ export class AuthService {
         id: user.id,
       },
       omit: {
-        password: true,
+        password: true
       },
-    });
+      include: {
+        plan: {
+          include: {
+            planTemplate: {
+              select: {
+                type: true
+              }
+            }
+          }
+        }
+      }
+    })
 
     if (!isUser) {
       throw new NotFoundException('User Not Found!')

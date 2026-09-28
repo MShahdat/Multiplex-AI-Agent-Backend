@@ -2,7 +2,7 @@ import { InternalServerErrorException } from "@nestjs/common";
 import config from "../config/index.js";
 import { prisma } from "../lib/prisma.js";
 import bcrypt from 'bcrypt'
-import { PlanType, Role } from "../../../generated/prisma/enums.js";
+import { PlanType, Role, SubscriptionType } from "../../../generated/prisma/enums.js";
 import { MODEL_ALLOWED } from "../lib/groq.js";
 import { encryptApiKey } from "../lib/crypto.js";
 
@@ -61,162 +61,163 @@ export const seedTesterAdmin = async () => {
 
 
 export const freeTemplate = async () => {
-  const isTemp = await prisma.planTemplate.findUnique({
-    where: {
-      type: PlanType.FREE
-    }
-  })
-
-  if (isTemp) {
-    console.log('Free plan templete alredy exists')
-    return
-  }
-  const planTemplate = await prisma.planTemplate.create({
-
-    data: {
+  return prisma.planTemplate.upsert({
+    where: { code: 'FREE' },
+    update: {
       type: PlanType.FREE,
       price: 0.00,
-      status: true,
+      billingCycle: null,
+      isActive: true,
+    },
+    create: {
+      type: PlanType.FREE,
+      price: 0.00,
+      code: 'FREE',
+      billingCycle: null,
+      isActive: true,
     },
   });
+};
 
-  return planTemplate;
+const PREMIUM_TEMPLATES = [
+  {
+    code: 'PREMIUM_MONTHLY',
+    billingCycle: SubscriptionType.MONTHLY,
+    price: 500
+  },
+  {
+    code: 'PREMIUM_HALF_YEARLY',
+    billingCycle: SubscriptionType.HALF_YEARLY,
+    price: 2500
+  },
+  {
+    code: 'PREMIUM_YEARLY',
+    billingCycle: SubscriptionType.YEARLY,
+    price: 4500
+  }
+] as const
+
+export const premiumTemplates = async () => {
+  for (const t of PREMIUM_TEMPLATES) {
+    await prisma.planTemplate.upsert({
+      where: {
+        type_billingCycle: {
+          type: PlanType.PREMIUM,
+          billingCycle: t.billingCycle,
+        },
+      },
+      update: {
+        code: t.code,
+        price: t.price,
+        isActive: true
+      },
+      create: {
+        code: t.code,
+        type: PlanType.PREMIUM,
+        billingCycle: t.billingCycle,
+        price: t.price,
+        isActive: true,
+      },
+    });
+  }
 };
 
 
 export const providers = async () => {
-  const seededProviders: any[] = [];
-
   for (const item of MODEL_ALLOWED) {
     const { iv, authTag, encryptKey } = encryptApiKey(config.groq_api_key);
-
-    const isProvider = await prisma.aiProvider.findUnique({
-      where: {
-        model: item.model
-      }
-    })
-
-    if (isProvider) {
-      console.log(`${item.model} already exists`);
-      continue
-    }
-
-    const provider = await prisma.aiProvider.create({
-      data: {
+    await prisma.aiProvider.upsert({
+      where: { model: item.model },
+      update: {
+        name: item.name,
+        type: item.type,
+        isPremium: (item as any).isPremium ?? false, // flips safeguard to true
+        isEnabled: true,
+        isDefault: item.model === "qwen/qwen3.8-27b",
+      },
+      create: {
         name: item.name,
         model: item.model,
         type: item.type,
-        authTag,
-        encryptedApiKey: encryptKey,
-        iv,
-        isDefault: item.model === 'qwen/qwen3.8-27b',
-      },
-    });
-
-    seededProviders.push(provider);
-  }
-
-  return seededProviders;
-};
-
-export const providerTem = async () => {
-  const freePlan = await prisma.planTemplate.findUnique({
-    where: {
-      type: PlanType.FREE
-    }
-  });
-
-  if (!freePlan) {
-    console.log('something went wrong')
-    return
-  }
-  const availableProviders = await prisma.aiProvider.findMany();
-
-  const qwen3827b = availableProviders.find((p: any) => p.model === 'qwen/qwen3.8-27b')
-
-  const openai_gpt_120b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-120b');
-  const openai_gpt_20b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-20b');
-  const openai_gpt_safeguard_20b = availableProviders.find((p: any) => p.model === 'openai/gpt-oss-safeguard-20b');
-
-  if (!qwen3827b || !openai_gpt_120b || !openai_gpt_20b || !openai_gpt_safeguard_20b) {
-    throw new Error('Missing required AI providers for free plan limits.');
-  }
-
-  const limits = [
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: qwen3827b.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 1000,
-      requestPerMin: 30,
-      tokenPerDay: 200000,
-      tokenPerMin: 8000,
-    },
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: openai_gpt_120b.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 1000,
-      requestPerMin: 30,
-      tokenPerDay: 200000,
-      tokenPerMin: 8000,
-    },
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: openai_gpt_20b.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 1000,
-      requestPerMin: 30,
-      tokenPerDay: 200000,
-      tokenPerMin: 8000,
-    },
-    {
-      planTemplateId: freePlan.id,
-      aiProviderId: openai_gpt_safeguard_20b.id,
-      maxTokenPerRequest: 2048,
-      requestPerDay: 1000,
-      requestPerMin: 30,
-      tokenPerDay: 200000,
-      tokenPerMin: 8000,
-    },
-  ];
-
-  for (const limit of limits) {
-
-    const isLimit = await prisma.planProviderLimit.findUnique({
-      where: {
-        planTemplateId_aiProviderId: {
-          planTemplateId: limit.planTemplateId,
-          aiProviderId: limit.aiProviderId
-        }
-      }
-    })
-
-    if (isLimit) {
-      // console.log(`already exists`)
-      continue
-    }
-
-    await prisma.planProviderLimit.create({
-      data: {
-        requestPerDay: limit.requestPerDay,
-        requestPerMinute: limit.requestPerMin,
-        tokenPerDay: limit.tokenPerDay,
-        tokenPerMinute: limit.tokenPerMin,
-        maxTokensPerRequest: limit.maxTokenPerRequest,
-        planTemplate: {
-          connect: { id: limit.planTemplateId },
-        },
-        aiProvider: {
-          connect: { id: limit.aiProviderId },
-        },
+        isPremium: (item as any).isPremium ?? false,
+        encryptedApiKey: encryptKey, iv, authTag,
+        isDefault: item.model === "qwen/qwen3.8-27b",
       },
     });
   }
 };
 
+const FREE_LIMIT = {
+  requestPerMinute: 10,
+  requestPerDay: 100,
+  tokenPerMinute: 4000,
+  tokenPerDay: 100000,
+  maxTokensPerRequest: 2048
+};
+
+const PREMIUM_LIMIT = {
+  requestPerMinute: 30,
+  requestPerDay: 1000,
+  tokenPerMinute: 8000,
+  tokenPerDay: 200000,
+  maxTokensPerRequest: 2048
+};
+
+
+const FREE_MODELS = MODEL_ALLOWED.filter(m => !m.isPremium).map(m => m.model);
+const PREMIUM_MODELS = MODEL_ALLOWED.filter(m => m.isPremium).map(m => m.model);
+
+const PREMIUM_ACCESS_MODELS = [...FREE_MODELS, ...PREMIUM_MODELS];
+
+const PREMIUM_CODES = ["PREMIUM_MONTHLY", "PREMIUM_HALF_YEARLY", "PREMIUM_YEARLY"] as const;
 
 
 
+export const planProviderLimits = async () => {
+  const templates = await prisma.planTemplate.findMany();
+  const providersList = await prisma.aiProvider.findMany();
 
+
+  const tByCode: Record<string, (typeof templates)[number]> = {};
+  for (const t of templates) tByCode[t.code] = t;
+
+  const pByModel: Record<string, (typeof providersList)[number]> = {};
+  for (const p of providersList) pByModel[p.model] = p;
+
+  if (!tByCode['FREE']) { console.log('FREE missing'); return; }
+
+
+  for (const premiumModel of PREMIUM_MODELS) {
+    const p = pByModel[premiumModel];
+    if (p) await prisma.planProviderLimit.deleteMany({
+      where: { planTemplateId: tByCode['FREE'].id, aiProviderId: p.id }
+    });
+  }
+
+
+  for (const model of FREE_MODELS) {
+    const t = tByCode['FREE']; const p = pByModel[model];
+    if (!t || !p) { console.log(`skip FREE ${model}`); continue; }
+    await prisma.planProviderLimit.upsert({
+      where: { planTemplateId_aiProviderId: { planTemplateId: t.id, aiProviderId: p.id } },
+      update: { ...FREE_LIMIT },
+      create: { planTemplateId: t.id, aiProviderId: p.id, ...FREE_LIMIT },
+    });
+  }
+
+  for (const code of PREMIUM_CODES) {
+    const t = tByCode[code];
+    if (!t) { console.log(`skip missing template ${code}`); continue; }
+    for (const model of PREMIUM_ACCESS_MODELS) {
+      const p = pByModel[model];
+      if (!p) { console.log(`skip ${code} ${model}`); continue; }
+      await prisma.planProviderLimit.upsert({
+        where: { planTemplateId_aiProviderId: { planTemplateId: t.id, aiProviderId: p.id } },
+        update: { ...PREMIUM_LIMIT },
+        create: { planTemplateId: t.id, aiProviderId: p.id, ...PREMIUM_LIMIT },
+      });
+    }
+  }
+  console.log('Limits ensured: FREE x free-only, PREMIUM_* x all');
+};
 

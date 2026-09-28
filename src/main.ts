@@ -7,7 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './app/common/interceptors/response.interceptor.js';
 import cookieParser from "cookie-parser";
 import passport from 'passport';
-import { freeTemplate, providers, providerTem, seedTesterAdmin } from './app/utils/seed.js';
+import { freeTemplate, planProviderLimits, premiumTemplates, providers, seedTesterAdmin } from './app/utils/seed.js';
 import { deleteUserFromDB } from './app/lib/cron.js';
 
 
@@ -49,8 +49,9 @@ async function bootstrap() {
     await deleteUserFromDB()
 
     await freeTemplate()
+    await premiumTemplates()
     await providers()
-    await providerTem()
+    await planProviderLimits()
 
     await app.listen(PORT, () => {
       console.log(`server is running port ${PORT}`);

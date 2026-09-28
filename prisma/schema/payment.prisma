@@ -4,7 +4,7 @@ model Payment {
   amount   Decimal       @db.Decimal(10, 2)
   method   PaymentMethod
   currency String
-  status   PaymentStatus
+  status   PaymentStatus @default(PENDING)
   paidAt   DateTime      @default(now())
 
   stripeCustomerId     String? @unique
@@ -17,7 +17,7 @@ model Payment {
 
   createdAt DateTime @default(now())
 
-  subscriptionId String
+  subscriptionId String       @unique
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, paidAt])

@@ -1,10 +1,11 @@
 model AiProvider {
   id String @id @default(uuid())
 
-  name    String
-  type    ProviderType
-  baseUrl String?
-  model   String       @unique
+  name      String
+  type      ProviderType
+  baseUrl   String?
+  model     String       @unique
+  isPremium Boolean      @default(false)
 
   encryptedApiKey String
   iv              String
