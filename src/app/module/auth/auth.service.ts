@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -14,7 +15,7 @@ import { redisClient } from '../../lib/redis.js';
 import path from 'path';
 import ejs from 'ejs';
 import { transporter } from '../../lib/nodemailer.js';
-import { Role } from '../../../../generated/prisma/enums.js';
+import { PlanType, Role } from '../../../../generated/prisma/enums.js';
 import { EmailVerifyDto, ForgotPasswordDto, LoginUserDto, RegisterUserDto, ResetPasswordDto } from './auth.dto.js';
 import { jwtUtils } from '../../utils/jwt.js';
 import { UserStatus } from '../../../../generated/prisma/enums.js';
@@ -125,47 +126,94 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    const user = await prisma.user.create({
-      data: {
-        name: payloadData.name,
-        email: payloadData.email,
-        password: payloadData.password,
-        role: Role.USER,
-        emailVerified: true,
-        status: 'ACTIVE',
+
+    const transactionRes = await prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: payloadData.name,
+            email: payloadData.email,
+            password: payloadData.password,
+            role: Role.USER,
+            emailVerified: true,
+            status: 'ACTIVE',
+          },
+          omit: {
+            password: true,
+          },
+        });
+
+        const planTemp = await tx.planTemplate.findUnique({
+          where: {
+            type: PlanType.FREE
+          }
+        })
+
+        if (!planTemp) {
+          throw new NotFoundException('Free Plan templete not found')
+        }
+
+        const totals = await tx.planProviderLimit.aggregate({
+          where: {
+            aiProvider: {
+              isEnabled: true
+            }
+          },
+          _sum: {
+            requestPerMinute: true,
+            requestPerDay: true,
+            tokenPerMinute: true,
+            tokenPerDay: true,
+          },
+        });
+
+        console.log(totals._sum.requestPerDay);
+
+        await tx.plan.create({
+          data: {
+            planTemplateId: planTemp.id,
+            userId: user.id,
+            tokensUserPerMin: totals._sum.tokenPerMinute ?? 0,
+            tokensUsedPerDay: totals._sum.tokenPerDay ?? 0,
+            requestsUsedPerMin: totals._sum.requestPerMinute ?? 0,
+            requestsUsedPerDay: totals._sum.requestPerDay ?? 0,
+          },
+        });
+
+        await redisClient.del([otpKey, registerKey]);
+
+        const jwtPayload = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        };
+
+        const accessToken = jwtUtils.createToken(
+          jwtPayload,
+          config.jwt_access_secret,
+          config.jwt_access_expires_in as SignOptions,
+        );
+
+        const refreshToken = jwtUtils.createToken(
+          jwtPayload,
+          config.jwt_refresh_secret,
+          config.jwt_refresh_expires_in as SignOptions,
+        );
+        return {
+          accessToken,
+          refreshToken,
+          user
+        };
+
       },
-      omit: {
-        password: true,
-      },
-    });
+      {
+        timeout: 10000,
+        maxWait: 15000
+      }
+    )
 
-    await redisClient.del([otpKey, registerKey]);
-
-    const jwtPayload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    };
-
-    const accessToken = jwtUtils.createToken(
-      jwtPayload,
-      config.jwt_access_secret,
-      config.jwt_access_expires_in as SignOptions,
-    );
-
-    const refreshToken = jwtUtils.createToken(
-      jwtPayload,
-      config.jwt_refresh_secret,
-      config.jwt_refresh_expires_in as SignOptions,
-    );
-
-
-    return {
-      accessToken,
-      refreshToken,
-      user
-    };
+    return transactionRes
   }
 
 

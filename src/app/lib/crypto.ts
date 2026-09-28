@@ -5,10 +5,10 @@ import config from '../config/index.js'
 const KEY = crypto.createHash('sha256').update(config.encryption_key).digest();
 
 
-export const encryptApiKey = (plain: string) => {
+export const encryptApiKey = (key: string) => {
   const iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', KEY, iv)
-  const enc = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
+  const enc = Buffer.concat([c.update(key, 'utf8'), c.final()]);
 
   return {
     encryptKey: enc.toString('hex'),

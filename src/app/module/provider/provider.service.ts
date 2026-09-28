@@ -1,67 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateProviderDto, UpdateProviderDto } from './provider.dto.js';
+import { UpdateProviderDto } from './provider.dto.js';
 import { prisma } from '../../lib/prisma.js';
-import { encryptApiKey } from '../../lib/crypto.js';
-import { GROQ_ALLOWED } from '../../lib/groq.js';
+
 
 @Injectable()
 export class ProviderService {
-
-
-  private getMaxTokensForModel(model: string): number {
-    switch (model) {
-      case 'llama-3.3-70b-versatile':
-        return 32768;
-      case 'llama-3.1-8b-instant':
-        return 131072;
-      case 'openai/gpt-oss-120b':
-        return 65536;
-      default:
-        return 4096;
-    }
-  }
-
-
-  //& CREATE
-  async create(payload: CreateProviderDto) {
-
-    const isModel = await prisma.aiProvider.findUnique({
-      where: {
-        model: payload.model
-      }
-    })
-
-    if (isModel) {
-      throw new ConflictException('model alraedy exists!')
-    }
-
-
-    if (!GROQ_ALLOWED.includes(payload.model)) {
-      throw new BadRequestException('Please add correct model name')
-    }
-
-    const maxToken = this.getMaxTokensForModel(payload.model)
-    const { iv, authTag, encryptKey } = encryptApiKey(payload.apiKey)
-
-    const createProvider = await prisma.aiProvider.create({
-      data: {
-        name: payload.name,
-        model: payload.model,
-        type: payload.type,
-        authTag,
-        encryptedApiKey: encryptKey,
-        iv,
-        maxTokensPerRequest: maxToken
-      },
-      omit: {
-        encryptedApiKey: true,
-        authTag: true,
-        iv: true
-      }
-    })
-
-    return createProvider
-  }
 
 
   //& GET ALL BY ADMIN
@@ -81,8 +24,7 @@ export class ProviderService {
   async getModels() {
     const res = await prisma.aiProvider.findMany({
       where: {
-        isEnabled: true,
-        isHealthy: true,
+        isEnabled: true
       },
       omit: {
         authTag: true,
@@ -95,8 +37,8 @@ export class ProviderService {
 
 
 
-  //& UPDATE (ADMIN)
-  async updateModel(payload: UpdateProviderDto, id: string) {
+  //& ENABLED (ADMIN)
+  async updateModel(id: string) {
 
     const isModel = await prisma.aiProvider.findUnique({
       where: {
@@ -108,35 +50,19 @@ export class ProviderService {
       throw new NotFoundException('Model not found')
     }
 
+    if (isModel.isEnabled) {
+      throw new BadRequestException('already enabled')
+    }
 
-    const transactionRes = await prisma.$transaction(
-      async (tx) => {
-        if (payload.isDefault) {
-          await tx.aiProvider.updateMany({
-            data: {
-              isDefault: false
-            }
-          })
-        }
-
-        const update = await tx.aiProvider.update({
-          where: {
-            id
-          },
-          data: {
-            ...payload
-          }
-        })
-
-        return update
-
+    await prisma.aiProvider.update({
+      where: {
+        id
       },
-      {
-        maxWait: 10000,
-        timeout: 15000
+      data: {
+        isEnabled: true
       }
-    )
-    return transactionRes
+    })
+
   }
 
 
@@ -153,11 +79,7 @@ export class ProviderService {
       throw new NotFoundException('Model not found')
     }
 
-    if (isModel.isDefault) {
-      throw new BadRequestException('You can not disable model. Please remove default first!')
-    }
-
-    if (isModel.isEnabled) {
+    if (!isModel.isEnabled) {
       throw new ConflictException('already disabled')
     }
 
@@ -169,8 +91,10 @@ export class ProviderService {
         isEnabled: false
       }
     })
-
   }
+
 }
+
+
 
 

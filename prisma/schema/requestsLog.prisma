@@ -1,0 +1,16 @@
+model RequestsLog {
+  id String @id @default(uuid())
+
+  apiEndpoint String
+  method      String
+  latency     Int
+  statusCode  Int?
+  message     String?
+
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("requestsLog")
+}

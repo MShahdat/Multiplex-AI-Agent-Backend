@@ -5,7 +5,7 @@ CREATE TYPE "Role" AS ENUM ('ADMIN', 'USER');
 CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'BLOCKED', 'DELETED');
 
 -- CreateEnum
-CREATE TYPE "AuthProvider" AS ENUM ('CREADENTIAL', 'GOOGLE', 'GITHUB', 'FACEBOOK');
+CREATE TYPE "AuthProvider" AS ENUM ('CREDENTIAL', 'GOOGLE', 'GITHUB', 'FACEBOOK');
 
 -- CreateEnum
 CREATE TYPE "PlanType" AS ENUM ('FREE', 'PREMIUM');
@@ -14,13 +14,13 @@ CREATE TYPE "PlanType" AS ENUM ('FREE', 'PREMIUM');
 CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'CANCELED', 'EXPIRED');
 
 -- CreateEnum
-CREATE TYPE "SubscriptionType" AS ENUM ('MONTHLY', 'HEALF_YEARLY', 'YEARLY');
+CREATE TYPE "SubscriptionType" AS ENUM ('MONTHLY', 'HALF_YEARLY', 'YEARLY');
 
 -- CreateEnum
 CREATE TYPE "PaymentMethod" AS ENUM ('CARD', 'BKASH');
 
 -- CreateEnum
-CREATE TYPE "ProviderType" AS ENUM ('OPENAI', 'CLAUDE');
+CREATE TYPE "ProviderType" AS ENUM ('GROQ', 'ANTHROPIC');
 
 -- CreateEnum
 CREATE TYPE "MessageStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
@@ -37,6 +37,7 @@ CREATE TABLE "conversations" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
+    "providerId" TEXT,
 
     CONSTRAINT "conversations_pkey" PRIMARY KEY ("id")
 );
@@ -45,7 +46,7 @@ CREATE TABLE "conversations" (
 CREATE TABLE "messages" (
     "id" TEXT NOT NULL,
     "prompt" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
+    "content" TEXT,
     "status" "MessageStatus" NOT NULL DEFAULT 'PENDING',
     "promptTokens" INTEGER,
     "completionTokens" INTEGER,
@@ -54,8 +55,7 @@ CREATE TABLE "messages" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "conversationId" TEXT NOT NULL,
-    "providerId" TEXT NOT NULL,
-    "requestedLogId" TEXT,
+    "providerId" TEXT,
 
     CONSTRAINT "messages_pkey" PRIMARY KEY ("id")
 );
@@ -71,7 +71,7 @@ CREATE TABLE "payments" (
     "stripeCustomerId" TEXT,
     "stripeSubscriptionId" TEXT,
     "bKashPaymentId" TEXT,
-    "transectionId" TEXT,
+    "transactionId" TEXT,
     "payerReference" TEXT,
     "merchantInvoiceNumber" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -83,13 +83,16 @@ CREATE TABLE "payments" (
 -- CreateTable
 CREATE TABLE "plans" (
     "id" TEXT NOT NULL,
-    "name" "PlanType" NOT NULL,
+    "tpye" "PlanType" NOT NULL,
     "price" DECIMAL(10,2),
     "tokenLimitToday" INTEGER NOT NULL,
     "tokenLimitMonth" INTEGER NOT NULL,
+    "requestsLimitToday" INTEGER NOT NULL,
+    "requestsLimitMonth" INTEGER NOT NULL,
     "status" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
 
     CONSTRAINT "plans_pkey" PRIMARY KEY ("id")
 );
@@ -101,15 +104,13 @@ CREATE TABLE "ai_providers" (
     "type" "ProviderType" NOT NULL,
     "baseUrl" TEXT,
     "model" TEXT NOT NULL,
+    "tier" "PlanType" NOT NULL DEFAULT 'FREE',
     "encryptedApiKey" TEXT NOT NULL,
     "iv" TEXT NOT NULL,
     "authTag" TEXT NOT NULL,
     "isEnabled" BOOLEAN NOT NULL DEFAULT true,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
-    "lastHealthCheck" TIMESTAMP(3),
-    "isHealthy" BOOLEAN NOT NULL DEFAULT true,
     "maxTokensPerRequest" INTEGER,
-    "costPerMillionTokens" DECIMAL(10,4),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -117,29 +118,26 @@ CREATE TABLE "ai_providers" (
 );
 
 -- CreateTable
-CREATE TABLE "request_logs" (
+CREATE TABLE "requestsLog" (
     "id" TEXT NOT NULL,
-    "endpoint" TEXT NOT NULL,
+    "apiEndpoint" TEXT NOT NULL,
     "method" TEXT NOT NULL,
-    "statusCode" INTEGER NOT NULL,
-    "latencyMs" INTEGER NOT NULL,
-    "tokensUsed" INTEGER DEFAULT 0,
+    "latency" INTEGER NOT NULL,
+    "statusCode" INTEGER,
+    "message" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" TEXT NOT NULL,
 
-    CONSTRAINT "request_logs_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "requestsLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "subscriptions" (
     "id" TEXT NOT NULL,
     "status" "SubscriptionStatus" NOT NULL DEFAULT 'ACTIVE',
-    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "renewsAt" TIMESTAMP(3),
+    "currentPeriodEnd" TIMESTAMP(3),
     "canceledAt" TIMESTAMP(3),
     "type" "SubscriptionType" NOT NULL,
-    "requestsUsedToday" INTEGER NOT NULL DEFAULT 0,
-    "tokensUsedThisMonth" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
@@ -157,9 +155,10 @@ CREATE TABLE "users" (
     "googleId" TEXT,
     "facebookId" TEXT,
     "githubId" TEXT,
-    "authProvider" "AuthProvider" NOT NULL DEFAULT 'CREADENTIAL',
+    "authProvider" "AuthProvider" NOT NULL DEFAULT 'CREDENTIAL',
     "imagePublicId" TEXT,
     "imageURL" TEXT,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
     "role" "Role" NOT NULL DEFAULT 'USER',
     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
@@ -177,6 +176,9 @@ CREATE INDEX "conversations_userId_updatedAt_idx" ON "conversations"("userId", "
 CREATE INDEX "messages_conversationId_createdAt_idx" ON "messages"("conversationId", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "messages_providerId_idx" ON "messages"("providerId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "payments_stripeCustomerId_key" ON "payments"("stripeCustomerId");
 
 -- CreateIndex
@@ -186,25 +188,22 @@ CREATE UNIQUE INDEX "payments_stripeSubscriptionId_key" ON "payments"("stripeSub
 CREATE UNIQUE INDEX "payments_bKashPaymentId_key" ON "payments"("bKashPaymentId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "payments_transectionId_key" ON "payments"("transectionId");
+CREATE UNIQUE INDEX "payments_transactionId_key" ON "payments"("transactionId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "payments_merchantInvoiceNumber_key" ON "payments"("merchantInvoiceNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "payments_subscriptionId_key" ON "payments"("subscriptionId");
+CREATE INDEX "payments_subscriptionId_paidAt_idx" ON "payments"("subscriptionId", "paidAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "plans_name_key" ON "plans"("name");
+CREATE UNIQUE INDEX "plans_userId_key" ON "plans"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ai_providers_model_key" ON "ai_providers"("model");
 
 -- CreateIndex
 CREATE INDEX "ai_providers_type_isEnabled_idx" ON "ai_providers"("type", "isEnabled");
-
--- CreateIndex
-CREATE INDEX "request_logs_userId_createdAt_idx" ON "request_logs"("userId", "createdAt");
-
--- CreateIndex
-CREATE INDEX "request_logs_endpoint_createdAt_idx" ON "request_logs"("endpoint", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "subscriptions_userId_key" ON "subscriptions"("userId");
@@ -228,19 +227,22 @@ CREATE UNIQUE INDEX "users_githubId_key" ON "users"("githubId");
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "conversations" ADD CONSTRAINT "conversations_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "ai_providers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "messages" ADD CONSTRAINT "messages_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "ai_providers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "messages" ADD CONSTRAINT "messages_requestedLogId_fkey" FOREIGN KEY ("requestedLogId") REFERENCES "request_logs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "messages" ADD CONSTRAINT "messages_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "ai_providers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "payments" ADD CONSTRAINT "payments_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "request_logs" ADD CONSTRAINT "request_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "plans" ADD CONSTRAINT "plans_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "requestsLog" ADD CONSTRAINT "requestsLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -1,0 +1,21 @@
+model PlanProviderLimit {
+  id String @id @default(uuid())
+
+  maxTokensPerRequest Int?
+  requestPerMinute    Int
+  requestPerDay       Int
+  tokenPerMinute      Int
+  tokenPerDay         Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  planTemplateId String
+  planTemplate   PlanTemplate @relation(fields: [planTemplateId], references: [id], onDelete: Cascade)
+
+  aiProviderId String
+  aiProvider   AiProvider @relation(fields: [aiProviderId], references: [id], onDelete: Cascade)
+
+  @@unique([planTemplateId, aiProviderId])
+  @@map("plan_provider_limits")
+}

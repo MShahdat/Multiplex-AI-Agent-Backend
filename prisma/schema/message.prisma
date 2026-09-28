@@ -19,9 +19,6 @@ model Message {
   providerId String?
   provider   AiProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
-  requestedLog   RequestLog? @relation(fields: [requestedLogId], references: [id])
-  requestedLogId String?
-
   @@index([conversationId, createdAt])
   @@index([providerId])
   @@map("messages")

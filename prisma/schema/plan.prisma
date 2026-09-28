@@ -1,21 +1,20 @@
 model Plan {
   id String @id @default(uuid())
 
-  tpye  PlanType @unique
-  price Decimal? @db.Decimal(10, 2)
-
-  tokenLimitToday Int
-  tokenLimitMonth Int
-
-  requestsLimitToday Int
-  requestsLimitMonth Int
-
-  status Boolean @default(true)
+  tokensUserPerMin   Int @default(0)
+  tokensUsedPerDay   Int @default(0)
+  requestsUsedPerMin Int @default(0)
+  requestsUsedPerDay Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subscriptions Subscription[]
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planTemplateId String
+  planTemplate   PlanTemplate   @relation(fields: [planTemplateId], references: [id])
+  subscriptions  Subscription[]
 
   @@map("plans")
 }

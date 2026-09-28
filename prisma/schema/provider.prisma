@@ -5,7 +5,6 @@ model AiProvider {
   type    ProviderType
   baseUrl String?
   model   String       @unique
-  tier    PlanType     @default(FREE)
 
   encryptedApiKey String
   iv              String
@@ -14,18 +13,12 @@ model AiProvider {
   isEnabled Boolean @default(true)
   isDefault Boolean @default(false)
 
-  lastHealthCheck DateTime?
-  isHealthy       Boolean   @default(true)
-
-  maxTokensPerRequest  Int?
-  costPerMillionTokens Decimal? @db.Decimal(10, 4)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages    Message[]
-  conversion  Conversation[]
-  requestLogs RequestLog[]
+  messages      Message[]
+  conversations Conversation[]
+  planLimits    PlanProviderLimit[]
 
   @@index([type, isEnabled])
   @@map("ai_providers")

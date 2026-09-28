@@ -20,9 +20,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subscription Subscription[]
+  plan         Plan?
+  requestsLog  RequestsLog[]
+  subscription Subscription?
   conversation Conversation[]
-  requestedLog RequestLog[]
 
   @@map("users")
 }
