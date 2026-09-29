@@ -1,0 +1,924 @@
+{
+  "info": {
+    "name": "Multiplex Agent Backend API",
+    "description": "Complete Postman collection for Multiplex Agent Backend (NestJS 12 + Prisma 7 + PostgreSQL + Redis + Groq + Stripe/bKash).\n\nBase URL: `{{base_url}}` = http://localhost:5000\nGlobal prefix: `/api/v1`\n\nAUTH MODEL:\n- AuthGuard reads `accessToken` cookie FIRST, fallback `Authorization: Bearer {{accessToken}}`.\n- After Register > Verify, Login, Refresh, or OAuth callback, copy `accessToken` into collection variable `accessToken` (test scripts do this automatically).\n- Refresh endpoint uses `refreshToken` cookie. In Postman, it is sent automatically if cookies enabled, or set header `Cookie: refreshToken={{refreshToken}}`.\n- Roles: ADMIN-only, USER-only, ADMIN+USER. See each request description.\n\nRESPONSE WRAPPER (ResponseInterceptor): `{ \"success\": true, \"message\": string, \"data\": any, \"meta\"?: { total, page, limit, totalPages } }`\nVALIDATION: whitelist + forbidNonWhitelisted + transform — extra fields are rejected with 400.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "PASTE_ACCESS_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "PASTE_REFRESH_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "REPLACE_WITH_USER_ID",
+      "type": "string"
+    },
+    {
+      "key": "providerId",
+      "value": "REPLACE_WITH_PROVIDER_ID_FROM_GET_PROVIDER",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "REPLACE_WITH_CONVERSATION_ID_FROM_POST_MESSAGE",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "1. System",
+      "item": [
+        {
+          "name": "GET Root Health Check",
+          "request": {
+            "description": "Public. Health check. Returns `{ author, message }` wrapped by ResponseInterceptor.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Auth",
+      "description": "Base: `/api/v1/auth`. Public register/login/verify/forgot/reset + OAuth. Authenticated `GET /me`. Cookie-based refresh.",
+      "item": [
+        {
+          "name": "POST Register",
+          "request": {
+            "description": "Public. Creates pending payload in Redis + sends 6-digit OTP mail via EJS. Password rules: min 8 + upper + lower + number + special char.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Verify Email OTP",
+          "request": {
+            "description": "Public. Verifies OTP -> creates User + FREE Plan in transaction -> sets httpOnly cookies + returns tokens. Auto-saves tokens to collection variables.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/email-verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "email-verify"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const d = json.data || json; ",
+                  "  if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "  if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "} catch(e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST Login",
+          "request": {
+            "description": "Public. Blocks BLOCKED/DELETED users. Sets cookies + returns `{ accessToken, refreshToken }`. Auto-saves tokens.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Test@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const d = json.data || json;",
+                  "  if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "  if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "} catch(e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET Get Me Profile",
+          "request": {
+            "description": "Authenticated (AuthGuard). Send cookie `accessToken` (auto) OR header `Authorization: Bearer {{accessToken}}`. Rejects isDeleted / non-ACTIVE.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Refresh Token",
+          "request": {
+            "description": "Requires `refreshToken` cookie. Verifies JWT_REFRESH_SECRET, rotates both tokens, resets cookies. In Postman enable cookie jar OR send Cookie header manually.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "refreshToken={{refreshToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/refresh-token",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "refresh-token"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const d = json.data || json;",
+                  "  if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "  if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "} catch(e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST Forgot Password",
+          "request": {
+            "description": "Public. Sends forgot-password OTP mail (forgot.password.otp.ejs). Check inbox for 6-digit OTP.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "forgot-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Reset Password",
+          "request": {
+            "description": "Public. Verifies OTP from forgot-password, updates bcrypt-hashed password. newPassword has no strong-password validator in DTO, but use strong value.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"New@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "reset-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Google OAuth Initiate",
+          "request": {
+            "description": "Public. Browser only — initiates Google OAuth (passport-google-oauth20, scope profile email). Open in browser, not via Postman send. Callback sets cookies + returns tokens.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/google",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "google"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Google OAuth Callback",
+          "request": {
+            "description": "OAuth callback (handled by Passport). Browser redirect target. Returns cookies + `{ accessToken, refreshToken }`. Test in browser.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/google/callback",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "google", "callback"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Github OAuth Initiate",
+          "request": {
+            "description": "Public. Browser only — initiates GitHub OAuth (passport-github2, scope user:email). Email fetched via api.github.com/user/emails.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/github",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "github"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Github OAuth Callback",
+          "request": {
+            "description": "OAuth callback. Browser redirect target. Auto-provisions/links user, sets cookies + returns tokens.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/github/callback",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "github", "callback"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. User",
+      "description": "Base: `/api/v1/user`. Profile image (authenticated) + soft-delete (ADMIN).",
+      "item": [
+        {
+          "name": "PATCH Upload Profile Image",
+          "request": {
+            "description": "Authenticated. `multipart/form-data` with key `file` (FileInterceptor('file')). Validates image mimetype/size, streams to Cloudinary via streamifier, updates `imageURL`, deletes old. Select a local image file in Body > form-data.",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/your/avatar.jpg",
+                  "description": "In Postman: hover src, click 'Select Files', choose an image/* file. Key MUST be `file`."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user/profile-image",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user", "profile-image"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Soft Delete User by ID (ADMIN)",
+          "request": {
+            "description": "ADMIN only (AuthGuard + RolesGuard). No body — only `:id` path param. Sets isDeleted=true, status=DELETED, deletedAt=now. Cron hard-deletes later.",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user/delete/{{userId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user", "delete", "{{userId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Provider - AI Models",
+      "description": "Base: `/api/v1/provider`. Public list enabled models; ADMIN list all / enable / disable.",
+      "item": [
+        {
+          "name": "GET All Models (ADMIN)",
+          "request": {
+            "description": "ADMIN only. Lists ALL providers including disabled/premium.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/provider/all-model",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "provider", "all-model"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Public Enabled Models",
+          "request": {
+            "description": "Public (AuthGuard commented out). Optional `?query` passthrough e.g. `?search=llama`. Copy a provider `id` into collection variable `providerId` for POST /message.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/provider",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "provider"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const list = json.data || json;",
+                  "  if (Array.isArray(list) && list.length > 0 && list[0].id) {",
+                  "    pm.collectionVariables.set('providerId', list[0].id);",
+                  "    console.log('Saved providerId:', list[0].id);",
+                  "  }",
+                  "} catch(e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "PUT Enable Model (ADMIN)",
+          "request": {
+            "description": "ADMIN only. No body (UpdateProviderDto defined but unused). `:id` = provider id. Enables model (isEnabled=true).",
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/provider/{{providerId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "provider", "{{providerId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Disable Model (ADMIN)",
+          "request": {
+            "description": "ADMIN only. No body. `:id` = provider id. Disables model (isEnabled=false).",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/provider/{{providerId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "provider", "{{providerId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Message - Chat",
+      "description": "Base: `/api/v1/message`. Roles ADMIN+USER. Prompt -> Groq with premium gating (ACTIVE PREMIUM required for premium models). Auto-titles conversation (first 45 chars). Tracks token usage.",
+      "item": [
+        {
+          "name": "POST Send Prompt (New Conversation)",
+          "request": {
+            "description": "Authenticated ADMIN/USER. Omit `conversationId` for new conversation (auto-title). `providerId` required, `prompt` required max 2000 chars. Returns conversation + message with Groq usage. Save returned conversation id to `conversationId`.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"prompt\": \"Hello, explain what is NestJS in 2 lines?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/message",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const d = json.data || {};",
+                  "  const cid = d.conversationId || d.conversation?.id || d.id;",
+                  "  if (cid) pm.collectionVariables.set('conversationId', cid);",
+                  "} catch(e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST Send Prompt (Continue Conversation)",
+          "request": {
+            "description": "Authenticated ADMIN/USER. Include `conversationId` to continue existing thread (history sent to Groq).",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"conversationId\": \"{{conversationId}}\",\n  \"prompt\": \"Now give me a minimal controller example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/message",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET My Conversations",
+          "request": {
+            "description": "Authenticated ADMIN/USER. Lists own conversations with messages.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/message/my-conversation",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message", "my-conversation"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Single Conversation by ID",
+          "request": {
+            "description": "Authenticated ADMIN/USER. Ownership-checked. `:id` = conversation id.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/message/{{conversationId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message", "{{conversationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Update Conversation Title",
+          "request": {
+            "description": "Authenticated ADMIN/USER. Body UpdateTitleDto `{ title? }`. `:id` = conversation id.",
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My updated chat title\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/message/{{conversationId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message", "{{conversationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Archive Conversation",
+          "request": {
+            "description": "Authenticated ADMIN/USER. No body. Sets isArchived=true. `:id` = conversation id.",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/message/{{conversationId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message", "{{conversationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH Un-archive Conversation",
+          "request": {
+            "description": "Authenticated ADMIN/USER. No body. removeArchive sets isArchived=false.",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/message/remove/{{conversationId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "message", "remove", "{{conversationId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Subscription - Payments",
+      "description": "Base: `/api/v1/subscription`. CARD=Stripe Checkout (metadata subscriptionId+paymentId), BKASH=tokenized payment URL (Payment PENDING + DRAFT). Webhook/callback activate subscription, upgrade plan, PDF invoice + mail.",
+      "item": [
+        {
+          "name": "POST Create Subscription - CARD (Stripe)",
+          "request": {
+            "description": "USER only. Creates Stripe Checkout Session. Returns session URL — open in browser to pay. billingCycle: MONTHLY | HALF_YEARLY | YEARLY.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"CARD\",\n  \"billingCycle\": \"MONTHLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Subscription - BKASH",
+          "request": {
+            "description": "USER only. Returns bKash payment URL — open in browser to pay. Verifies/executes via GET /bkash/callback, then activates subscription. Other cycles: HALF_YEARLY, YEARLY.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"BKASH\",\n  \"billingCycle\": \"MONTHLY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET bKash Callback",
+          "request": {
+            "description": "Public. bKash redirects here with `?paymentID=xxx&status=success`. Verifies/executes payment, activates subscription, 302 redirects to FRONTEND_URL. Simulate by pasting paymentID from create step.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription/bkash/callback?paymentID=TRX123456&status=success",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription", "bkash", "callback"],
+              "query": [
+                {
+                  "key": "paymentID",
+                  "value": "TRX123456"
+                },
+                {
+                  "key": "status",
+                  "value": "success"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Stripe Webhook",
+          "request": {
+            "description": "Public. Stripe sends `checkout.session.completed` with `stripe-signature` header + RAW body (server uses rawBody:true). Cannot be tested manually without real signature — use `npm run stripe:webhook` (stripe listen --forward-to localhost:5000/api/v1/subscription/webhook) + real checkout. Included for documentation.",
+            "method": "POST",
+            "header": [
+              {
+                "key": "stripe-signature",
+                "value": "REPLACE_WITH_REAL_STRIPE_SIGNATURE"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test_webhook\",\n  \"type\": \"checkout.session.completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription", "webhook"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET All Subscriptions (ADMIN)",
+          "request": {
+            "description": "ADMIN only. Paginated + meta `{ total, page, limit, totalPages }`. Query: search, page, limit, status (DRAFT/ACTIVE/CANCELED/EXPIRED), type, sortBy, sortOrder.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription/all?page=1&limit=10&status=ACTIVE&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription", "all"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET My Subscriptions",
+          "request": {
+            "description": "ADMIN + USER. Own subscriptions paginated. Same IQuery params as /all.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/subscription/my?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "subscription", "my"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Analytics",
+      "item": [
+        {
+          "name": "GET Analytics Dashboard (ADMIN)",
+          "request": {
+            "description": "ADMIN only. Aggregates: totalUsers, totalAiProviders, activeProviders, premiumProviders, totalSubscription, totalActiveSubscriver, totalPayment (PAID), totalRevenue, currentMonthlyRevenue.",
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
