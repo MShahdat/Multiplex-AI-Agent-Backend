@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
 import { Role } from '../../../../generated/prisma/enums.js';
@@ -7,6 +8,7 @@ import { UpdateProviderDto } from './provider.dto.js';
 import { ProviderService } from './provider.service.js';
 import { prefix } from '../../utils/global.prefix.js';
 
+@ApiTags('Provider')
 @Controller(`${prefix}/provider`)
 export class ProviderController {
 
@@ -17,6 +19,12 @@ export class ProviderController {
   @Get('/all-model')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Admin list all providers incl. disabled/premium' })
+  @ApiResponse({ status: 200, description: 'All model retrive successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
   async getAllModel() {
 
     const res = await this.providerService.getAllModel()
@@ -30,6 +38,10 @@ export class ProviderController {
   //& GET ALL (PUBLIC)
   @Get()
   // @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Public list enabled models (?search, ?isPremium passthrough)' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by model/name' })
+  @ApiQuery({ name: 'isPremium', required: false, description: 'Filter true/false' })
+  @ApiResponse({ status: 200, description: 'All model retrive successfully' })
   async getAll(
     @Query() query: Record<string, any>
   ) {
@@ -46,6 +58,13 @@ export class ProviderController {
   @Put('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Enable model (ADMIN only)' })
+  @ApiParam({ name: 'id', description: 'Provider ID' })
+  @ApiResponse({ status: 200, description: 'Model Enabled successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
+  @ApiResponse({ status: 404, description: 'Model not found' })
   async update(
     @Param('id') id: string
   ) {
@@ -62,6 +81,13 @@ export class ProviderController {
   @Patch('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Disable model (ADMIN only)' })
+  @ApiParam({ name: 'id', description: 'Provider ID' })
+  @ApiResponse({ status: 200, description: 'Model Disabled successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
+  @ApiResponse({ status: 404, description: 'Model not found' })
   async disableModel(
     @Param('id') id: string
   ) {

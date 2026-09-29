@@ -7,9 +7,11 @@ export class LoggerModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(RequestLoggerMiddleware)
-      // .exclude(
-      //   { path: 'api/v1/subscription/webhook', method: RequestMethod.ALL },
-      // )
+      .exclude(
+        { path: 'api/docs', method: RequestMethod.ALL },
+        { path: 'api/docs-json', method: RequestMethod.ALL },
+        { path: 'api/docs-yaml', method: RequestMethod.ALL },
+      )
       .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

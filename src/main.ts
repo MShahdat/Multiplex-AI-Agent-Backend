@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 import passport from 'passport';
 import { freeTemplate, planProviderLimits, premiumTemplates, providers, seedTesterAdmin } from './app/utils/seed.js';
 import { deleteSubscriptionPaymentFromDB, deleteUserFromDB } from './app/lib/cron.js';
+import { setupSwagger } from './app/docs/swagger.config.js';
 
 
 const PORT = config.port || 5000;
@@ -40,6 +41,8 @@ async function bootstrap() {
       new ResponseInterceptor
     )
 
+    setupSwagger(app);
+
     await prisma.$connect();
     console.log('Connected to the database successfully.');
 
@@ -58,6 +61,7 @@ async function bootstrap() {
 
     await app.listen(PORT, () => {
       console.log(`server is running port ${PORT}`);
+      console.log(`Swagger docs: http://localhost:${PORT}/api/docs`);
     });
   } catch (error) {
     console.log(error);

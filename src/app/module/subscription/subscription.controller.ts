@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Headers, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiHeader, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service.js';
 import { prefix } from '../../utils/global.prefix.js';
 import { SubscriptionDto } from './subscription.dto.js';
@@ -13,6 +14,7 @@ import type { IQuery } from '../../interface/index.js';
 import type { RawBodyRequest } from '@nestjs/common'
 
 
+@ApiTags('Subscription')
 @Controller(`${prefix}/subscription`)
 export class SubscriptionController {
 
@@ -21,6 +23,12 @@ export class SubscriptionController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.USER)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Create subscription (USER only): BKASH → payment URL, CARD → Stripe checkout' })
+  @ApiBody({ type: SubscriptionDto })
+  @ApiResponse({ status: 201, description: 'Payment url / Checkout session created successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden: USER only' })
   async subscriptionCreate(
     @Body() payload: SubscriptionDto,
     @CurrentUser() user: AuthenticatedUser
@@ -44,6 +52,10 @@ export class SubscriptionController {
   }
 
   @Get('/bkash/callback')
+  @ApiOperation({ summary: 'bKash callback — verifies payment, 302 redirect to frontend (not JSON envelope)' })
+  @ApiQuery({ name: 'paymentID', required: false, description: 'bKash paymentID' })
+  @ApiQuery({ name: 'status', required: false, description: 'success | failure | cancel' })
+  @ApiResponse({ status: 302, description: 'Redirects to FRONTEND_URL/dashboard/?status=success' })
   async bkashCallback(
     @Query() query: Record<string, any>,
     @Res() response: Response,
@@ -56,6 +68,10 @@ export class SubscriptionController {
 
 
   @Post('/webhook')
+  @ApiOperation({ summary: 'Stripe webhook (rawBody + stripe-signature, not JSON — Try-it-out will fail signature)' })
+  @ApiHeader({ name: 'stripe-signature', required: true, description: 'Stripe signature header' })
+  @ApiResponse({ status: 201, description: 'Stripe webhook received: { data: { received: true } }' })
+  @ApiResponse({ status: 400, description: 'Missing Stripe signature or raw request body' })
   async stripeWebhook(
     @Headers('stripe-signature') signature: string | undefined,
     @Req() request: RawBodyRequest<Request>,
@@ -72,6 +88,18 @@ export class SubscriptionController {
   @Get('/all')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Admin paginated list + meta (ADMIN only)' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 9 })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'ACTIVE', 'CANCELED', 'EXPIRED'] })
+  @ApiQuery({ name: 'type', required: false, enum: ['MONTHLY', 'HALF_YEARLY', 'YEARLY'] })
+  @ApiQuery({ name: 'sortBy', required: false, example: 'createdAt' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({ status: 200, description: 'Subscriptions retrieved successfully. Envelope includes meta{total,page,limit,totalPages}.' })
+  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
   async getAllSubscriptions(@Query() query: IQuery) {
     const res = await this.subscriptionService.getAllSubscription(query)
 
@@ -85,6 +113,17 @@ export class SubscriptionController {
   @Get('/my')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Own subscriptions paginated (PAID only)' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 9 })
+  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'ACTIVE', 'CANCELED', 'EXPIRED'] })
+  @ApiQuery({ name: 'type', required: false, enum: ['MONTHLY', 'HALF_YEARLY', 'YEARLY'] })
+  @ApiQuery({ name: 'sortBy', required: false, example: 'createdAt' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiResponse({ status: 200, description: 'My subscriptions retrieved successfully' })
   async getMySubscription(
     @Query() query: IQuery,
     @CurrentUser() user: AuthenticatedUser,

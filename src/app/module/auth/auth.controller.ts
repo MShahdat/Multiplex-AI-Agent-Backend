@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { prefix } from '../../utils/global.prefix.js';
 import { AuthService } from './auth.service.js';
 import { EmailVerifyDto, ForgotPasswordDto, LoginUserDto, RegisterUserDto, ResetPasswordDto } from './auth.dto.js';
@@ -21,6 +22,7 @@ import { Role } from '../../../../generated/prisma/enums.js';
 import config from '../../config/index.js';
 
 
+@ApiTags('Auth')
 @Controller(`${prefix}/auth`)
 export class AuthController {
   constructor(private authService: AuthService) { }
@@ -46,6 +48,11 @@ export class AuthController {
 
   //& REGISTER
   @Post('/register')
+  @ApiOperation({ summary: 'Register, send OTP mail' })
+  @ApiBody({ type: RegisterUserDto })
+  @ApiResponse({ status: 201, description: 'OTP send successfully. Wrapped as { success, message, data }.' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
   async create(@Body() payload: RegisterUserDto) {
 
     const result = await this.authService.create(payload);
@@ -58,6 +65,10 @@ export class AuthController {
 
   //& EMAIL VERIFY
   @Post('/email-verify')
+  @ApiOperation({ summary: 'Verify OTP, create user + FREE plan, set cookies' })
+  @ApiBody({ type: EmailVerifyDto })
+  @ApiResponse({ status: 201, description: 'User Created Successfully. Sets accessToken + refreshToken cookies.' })
+  @ApiResponse({ status: 400, description: 'Invalid/expired OTP' })
   async verifyEmail(
     @Body() payload: EmailVerifyDto,
     @Res({ passthrough: true }) res: Response
@@ -80,6 +91,10 @@ export class AuthController {
 
   //& LOGIN
   @Post('/login')
+  @ApiOperation({ summary: 'Credential login, set cookies' })
+  @ApiBody({ type: LoginUserDto })
+  @ApiResponse({ status: 201, description: 'User logged in successfully. Sets cookies.' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials or BLOCKED/DELETED user' })
   async loginUser(
     @Body() payload: LoginUserDto,
     @Res({ passthrough: true }) res: Response
@@ -101,6 +116,11 @@ export class AuthController {
   //& GET ME
   @Get('/me')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Get current profile (cookie accessToken or Bearer)' })
+  @ApiResponse({ status: 200, description: 'Profile fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized: token missing/invalid or user inactive' })
   async getMe(
     @CurrentUser() user: AuthenticatedUser
   ) {
@@ -115,6 +135,9 @@ export class AuthController {
 
   //& TOKEN REFRESH
   @Post('/refresh-token')
+  @ApiOperation({ summary: 'Rotate access + refresh pair via refreshToken cookie' })
+  @ApiResponse({ status: 201, description: 'Tokens refreshed successfully. Sets cookies.' })
+  @ApiResponse({ status: 401, description: 'Refresh token missing/invalid' })
   async refreshToken(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -139,6 +162,9 @@ export class AuthController {
 
   //& FORGOT PASSWORD OTP
   @Post('/forgot-password')
+  @ApiOperation({ summary: 'Send forgot-password OTP mail' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: 201, description: 'OTP send successfully' })
   async forgotPass(
     @Body() payload: ForgotPasswordDto
   ) {
@@ -152,6 +178,9 @@ export class AuthController {
 
   //& RESET PASSWORD (NEW PASSWORD)
   @Post('/reset-password')
+  @ApiOperation({ summary: 'Verify OTP, update hashed password' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 201, description: 'Password updated successfully' })
   async resetPassword(
     @Body() payload: ResetPasswordDto
   ) {
@@ -166,12 +195,17 @@ export class AuthController {
 
   //& GOOGLE LOGIN
   @Get('/google')
+  @ApiOperation({ summary: 'Initiate Google OAuth (passport redirect, 302 — Try-it-out will not complete flow)' })
+  @ApiResponse({ status: 302, description: 'Redirects to Google consent screen' })
   async googleLogin() {
 
   }
 
   //& CALLBACK
   @Get('/google/callback')
+  @ApiOperation({ summary: 'Google OAuth callback — sets cookies + returns tokens' })
+  @ApiResponse({ status: 200, description: 'User Logged in successfully' })
+  @ApiResponse({ status: 401, description: 'Google authentication failed' })
   async googleCallback(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Res({ passthrough: true }) res: Response,
@@ -195,6 +229,8 @@ export class AuthController {
 
   //& GITHUB LOGIN
   @Get('/github')
+  @ApiOperation({ summary: 'Initiate GitHub OAuth (passport redirect, 302)' })
+  @ApiResponse({ status: 302, description: 'Redirects to GitHub consent screen' })
   async githubLogin() {
   }
 
@@ -202,6 +238,9 @@ export class AuthController {
 
   //& CALLBACK (GITHUB)
   @Get('/github/callback')
+  @ApiOperation({ summary: 'GitHub OAuth callback — sets cookies + returns tokens' })
+  @ApiResponse({ status: 200, description: 'User logged in successfully' })
+  @ApiResponse({ status: 401, description: 'GitHub authentication failed' })
   async githubCallback(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Res({ passthrough: true }) res: Response,

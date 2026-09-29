@@ -8,6 +8,7 @@ import config from '../src/app/config/index.js';
 import { ResponseInterceptor } from '../src/app/common/interceptors/response.interceptor.js';
 import { prisma } from '../src/app/lib/prisma.js';
 import { redisClient } from '../src/app/lib/redis.js';
+import { setupSwagger } from '../src/app/docs/swagger.config.js';
 
 type ExpressHandler = (req: Request, res: Response) => void;
 
@@ -30,6 +31,7 @@ async function createHandler(): Promise<ExpressHandler> {
     }),
   );
   app.useGlobalInterceptors(new ResponseInterceptor());
+  setupSwagger(app);
 
   await prisma.$connect();
   if (!redisClient.isOpen) {
