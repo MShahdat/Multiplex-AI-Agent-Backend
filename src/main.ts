@@ -16,7 +16,9 @@ const PORT = config.port || 5000;
 async function bootstrap() {
   try {
 
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+      rawBody: true
+    });
 
     app.use(cookieParser());
     app.use(passport.initialize());

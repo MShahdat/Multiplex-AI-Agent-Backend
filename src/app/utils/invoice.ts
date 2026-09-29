@@ -11,7 +11,8 @@ export interface InvoiceData {
   amount: number | string;
   currency?: string;
   paymentMethod: string;
-  transactionId: string;
+  transactionId?: string;
+  paymentIntentId?: string;
   paidAt: Date | string;
   status?: string;
 }
@@ -265,7 +266,8 @@ export const generateInvoicePdf = (data: InvoiceData): Promise<Buffer> => {
 
     const details: [string, string][] = [
       ["Payment Method", data.paymentMethod],
-      ["Transaction ID", data.transactionId],
+      ["Transaction ID", data.transactionId ?? ''],
+      ["Payment Intent ID", data.paymentIntentId ?? ''],
       ["Paid At", formatDateTime(data.paidAt)],
     ];
     details.forEach(([label, value], i) => {

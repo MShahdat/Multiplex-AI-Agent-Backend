@@ -51,6 +51,8 @@ const config = {
   bkash_callback_url: process.env.BKASH_CALLBACK_URL!,
 
 
+  stripe_sercet_key: process.env.STRIPE_SECRET_KEY!,
+  stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET!,
 };
 
 export default config;

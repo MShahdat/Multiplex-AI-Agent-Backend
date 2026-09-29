@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "stripe:webhook": "stripe listen --forward-to localhost:5000/api/v1/subscription/webhook"
   },
   "dependencies": {
     "@nestjs/class-transformer": "^0.4.0",
@@ -51,7 +52,8 @@
     "redis": "^6.2.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "streamifier": "^0.1.1"
+    "streamifier": "^0.1.1",
+    "stripe": "^22.6.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

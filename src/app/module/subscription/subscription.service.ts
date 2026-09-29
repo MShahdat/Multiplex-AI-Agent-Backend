@@ -1,22 +1,25 @@
 import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { getBkashIdToken } from '../../lib/bkash.js';
-import { AuthenticatedUser } from '../../interface/index.js';
+import { AuthenticatedUser, IQuery } from '../../interface/index.js';
 import { SubscriptionDto } from './subscription.dto.js';
 import { prisma } from '../../lib/prisma.js';
 import { PaymentMethod, PaymentStatus, PlanType, SubscriptionStatus, SubscriptionType } from '../../../../generated/prisma/enums.js';
 import config from '../../config/index.js';
 import { randomUUID } from 'node:crypto';
 import { addMonths, addYears } from 'date-fns';
-import PDFDocument from "pdfkit";
 import { transporter } from '../../lib/nodemailer.js';
 import { generateInvoicePdf } from '../../utils/invoice.js';
+import { SubscriptionWhereInput } from '../../../../generated/prisma/models.js';
+import { stripe } from '../../lib/stripe.js';
+import { paymentSuccess } from './stripe.tuility.js';
+import Stripe from 'stripe';
 
 
 
 @Injectable()
 export class SubscriptionService {
 
-  //& CREATE PAYMENT
+  //& CREATE PAYMENT BY BKASH
   async subscription(payload: SubscriptionDto, user: AuthenticatedUser) {
 
     const premiumPlan = await prisma.planTemplate.findUnique({
@@ -236,7 +239,7 @@ export class SubscriptionService {
             planName: "Premium Plan",
             billingCycle: subscription.type,
             periodStart: subscription.currentPeriodStart,
-            periodEnd: subscription.currentPeriodEnd!,
+            periodEnd: currentPeriodEnd,
             amount: result.amount,
             currency: "BDT",
             paymentMethod: "bKash",
@@ -274,4 +277,347 @@ export class SubscriptionService {
     );
     return transactionResult;
   }
+
+
+  //& CRAETE CHECKOUT SESSION STRIPE
+  async createCheckoutSession(payload: SubscriptionDto, user: AuthenticatedUser) {
+
+    const premiumPlan = await prisma.planTemplate.findUnique({
+      where: {
+        type_billingCycle: {
+          type: PlanType.PREMIUM,
+          billingCycle: payload.billingCycle
+        }
+      },
+    });
+
+    if (!premiumPlan) {
+      throw new NotFoundException('No premium plan exists')
+    }
+
+    const isPlan = await prisma.plan.findUnique({
+      where: {
+        userId: user.id
+      }
+    })
+
+    if (!isPlan) {
+      throw new BadGatewayException('For subscription need to plan')
+    }
+
+    const planTemplate = await prisma.planTemplate.findUnique({
+      where: {
+        type_billingCycle: {
+          type: PlanType.PREMIUM,
+          billingCycle: payload.billingCycle
+        }
+      }
+    })
+
+    if (!planTemplate) {
+      throw new BadGatewayException('This subscription type not exist')
+    }
+    const amount = premiumPlan.price
+
+
+    const transactionRes = await prisma.$transaction(
+      async (tx) => {
+        const subscription = await tx.subscription.create({
+          data: {
+            type: payload.billingCycle,
+            currentPeriodStart: new Date(),
+            userId: user.id,
+            planId: isPlan.id,
+            planTemplateId: planTemplate.id
+          }
+        })
+
+        const payment = await tx.payment.create({
+          data: {
+            amount,
+            currency: 'BDT',
+            method: PaymentMethod.CARD,
+            status: PaymentStatus.PENDING,
+            subscriptionId: subscription.id,
+          }
+        })
+        const session = await stripe.checkout.sessions.create({
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "bdt",
+                unit_amount: Number(amount) * 100,
+                product_data: {
+                  name: `Subscription #${payload.billingCycle}`,
+                  description: "Premium Subscription"
+                }
+              }
+            }
+          ],
+          mode: "payment",
+          payment_method_types: ["card"],
+          success_url: `${config.frontend_url}/dashboard?success=true`,
+          cancel_url: `${config.frontend_url}/dashboard?success=false`,
+          metadata: {
+            subscriptionId: subscription.id,
+            paymentId: payment.id
+          }
+        });
+
+        return session.url
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000
+      }
+    )
+
+    return transactionRes
+  }
+
+
+  //& STRIPE WEBHOOK
+  async stripeWebhook(signature: string, payload: Buffer) {
+
+    const endpointSecret = config.stripe_webhook_secret;
+
+    const event = stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      endpointSecret
+    );
+
+    console.log('event.............................', event)
+    switch (event.type) {
+      case "checkout.session.completed":
+        console.log('seccess...')
+        await paymentSuccess(event.data.object as Stripe.Checkout.Session);
+        break;
+
+      default:
+        console.log("Unhandled Event");
+    }
+  };
+
+  //& GET ALL SUBSCRIPTION (ADMIN)
+  async getAllSubscription(query: IQuery) {
+
+    const sort = query.sortBy ? query.sortBy : 'createdAt'
+    const order = query.sortOrder ? query.sortOrder : 'desc'
+    const page = Number(query.page ?? 1)
+    const limit = Number(query.limit ?? 9)
+
+    if (!Number.isInteger(page) || page < 1) {
+      throw new BadRequestException('page must be a positive integer')
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException('limit must be an integer between 1 and 100')
+    }
+
+    const andConditions: SubscriptionWhereInput[] = []
+    const search = query.search?.trim()
+
+    if (search) {
+      andConditions.push({
+        OR: [
+          {
+            id: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          },
+          {
+            user: {
+              is: {
+                name: {
+                  contains: search,
+                  mode: 'insensitive'
+                }
+              }
+            }
+          },
+          {
+            user: {
+              is: {
+                email: { contains: search, mode: 'insensitive' }
+              }
+            }
+          },
+          {
+            planTemplate: {
+              is: {
+                code: { contains: search, mode: 'insensitive' }
+              }
+            }
+          },
+        ],
+      })
+    }
+
+    if (query.status !== undefined) {
+      if (!Object.values(SubscriptionStatus).includes(query.status as SubscriptionStatus)) {
+        throw new BadRequestException('Invalid subscription status')
+      }
+      andConditions.push({
+        status: query.status as SubscriptionStatus
+      })
+    }
+
+    if (query.type !== undefined) {
+      if (!Object.values(SubscriptionType).includes(query.type as SubscriptionType)) {
+        throw new BadRequestException('Invalid subscription type')
+      }
+      andConditions.push({ type: query.type as SubscriptionType })
+    }
+
+    const subscription = await prisma.subscription.findMany({
+      where: {
+        AND: andConditions
+      },
+      include: {
+        payment: true
+      },
+      take: limit,
+      skip: (page - 1) * limit,
+      orderBy: {
+        [sort]: order
+      },
+    })
+
+
+    const total = await prisma.subscription.count({
+      where: {
+        AND: andConditions
+      },
+    });
+
+    const meta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    return {
+      subscription,
+      meta,
+    };
+  }
+
+
+  //& GET MY SUBSCRIPTINS
+  async getMySubscription(query: IQuery, user: AuthenticatedUser) {
+
+    const sort = query.sortBy ? query.sortBy : 'createdAt'
+    const order = query.sortOrder ? query.sortOrder : 'desc'
+    const page = Number(query.page ?? 1)
+    const limit = Number(query.limit ?? 9)
+
+    if (!Number.isInteger(page) || page < 1) {
+      throw new BadRequestException('page must be a positive integer')
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException('limit must be an integer between 1 and 100')
+    }
+
+    const andConditions: SubscriptionWhereInput[] = [
+      {
+        userId: user.id
+      },
+      {
+        payment: {
+          status: PaymentStatus.PAID
+        }
+      }
+    ]
+    const search = query.search?.trim()
+
+    if (search) {
+      andConditions.push({
+        OR: [
+          {
+            id: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          },
+          {
+            user: {
+              is: {
+                name: {
+                  contains: search,
+                  mode: 'insensitive'
+                }
+              }
+            }
+          },
+          {
+            user: {
+              is: {
+                email: { contains: search, mode: 'insensitive' }
+              }
+            }
+          },
+          {
+            planTemplate: {
+              is: {
+                code: { contains: search, mode: 'insensitive' }
+              }
+            }
+          },
+        ],
+      })
+    }
+
+    if (query.status !== undefined) {
+      if (!Object.values(SubscriptionStatus).includes(query.status as SubscriptionStatus)) {
+        throw new BadRequestException('Invalid subscription status')
+      }
+      andConditions.push({
+        status: query.status as SubscriptionStatus
+      })
+    }
+
+    if (query.type !== undefined) {
+      if (!Object.values(SubscriptionType).includes(query.type as SubscriptionType)) {
+        throw new BadRequestException('Invalid subscription type')
+      }
+      andConditions.push({ type: query.type as SubscriptionType })
+    }
+
+    const subscription = await prisma.subscription.findMany({
+      where: {
+        AND: andConditions
+      },
+      include: {
+        payment: true
+      },
+      take: limit,
+      skip: (page - 1) * limit,
+      orderBy: {
+        [sort]: order
+      },
+    })
+
+
+    const total = await prisma.subscription.count({
+      where: {
+        AND: andConditions
+      },
+    });
+
+    const meta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    return {
+      subscription,
+      meta,
+    };
+  }
+
 }
