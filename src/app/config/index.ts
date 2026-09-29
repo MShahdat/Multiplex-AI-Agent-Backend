@@ -50,9 +50,12 @@ const config = {
   bkash_app_secret: process.env.BKASH_APP_SECRET!,
   bkash_callback_url: process.env.BKASH_CALLBACK_URL!,
 
-
   stripe_sercet_key: process.env.STRIPE_SECRET_KEY!,
   stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET!,
+
+  github_client_id: process.env.GITHUB_CLIENT_ID!,
+  github_client_secret: process.env.GITHUB_CLIENT_SECRET!,
+  github_callback_url: process.env.GITHUB_CALLBACK_URL!,
 };
 
 export default config;

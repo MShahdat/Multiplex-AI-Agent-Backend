@@ -13,6 +13,7 @@ export class ProviderController {
   constructor(private readonly providerService: ProviderService) { }
 
 
+  //& GET ALL MODEL (ADMIN)
   @Get('/all-model')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -26,6 +27,7 @@ export class ProviderController {
     }
   }
 
+  //& GET ALL (PUBLIC)
   @Get()
   // @UseGuards(AuthGuard)
   async getAll(
@@ -40,6 +42,7 @@ export class ProviderController {
   }
 
 
+  //& UPDATE (ADMIN)
   @Put('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -55,6 +58,7 @@ export class ProviderController {
     }
   }
 
+  //& DISABLE (ADMIN)
   @Patch('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)

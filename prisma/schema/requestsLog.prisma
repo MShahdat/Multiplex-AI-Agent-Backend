@@ -9,8 +9,9 @@ model RequestsLog {
 
   createdAt DateTime @default(now())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
+  @@index([apiEndpoint, method])
   @@map("requestsLog")
 }

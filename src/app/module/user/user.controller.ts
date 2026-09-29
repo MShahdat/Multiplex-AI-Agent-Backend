@@ -22,6 +22,7 @@ import { RolesGuard } from '../../common/guard/roles.guard.js';
 export class UserController {
   constructor(private readonly userService: UserService) { }
 
+  //& UPDATE PROFILE IMG
   @Patch('/profile-image')
   @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor('file'))
@@ -39,6 +40,7 @@ export class UserController {
     };
   }
 
+  //& USER SOFT DELETE
   @Patch('/delete/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN)

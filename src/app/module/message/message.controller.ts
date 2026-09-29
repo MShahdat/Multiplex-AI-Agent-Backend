@@ -14,6 +14,7 @@ export class MessageController {
 
   constructor(private readonly messageService: MessageService) { }
 
+  //& CREATE CHAT
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -29,6 +30,7 @@ export class MessageController {
   }
 
 
+  //& GET MY CONVERSATION
   @Get('/my-conversation')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -45,6 +47,7 @@ export class MessageController {
   }
 
 
+  //& GET BY ID
   @Get('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -61,6 +64,7 @@ export class MessageController {
 
 
 
+  //& UDPATE TITLE
   @Put('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -77,7 +81,7 @@ export class MessageController {
   }
 
 
-
+  //& ARCHIVED
   @Patch('/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -85,7 +89,7 @@ export class MessageController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string
   ) {
-    const res = await this.messageService.archive(id, user);
+    await this.messageService.archive(id, user);
     return {
       data: null,
       message: "Conversation archieved Successfully"
@@ -93,6 +97,7 @@ export class MessageController {
   }
 
 
+  //& REMOVED FROM ARCHIVED
   @Patch('/remove/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)

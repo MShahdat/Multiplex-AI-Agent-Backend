@@ -289,6 +289,15 @@ export class AuthService {
 
   //& GOOGLE LOGIN
   async loginWithGoogle(user: AuthenticatedUser) {
+    return this.createOAuthTokens(user);
+  }
+
+  //& GITHUB LOGIN
+  async loginWithGithub(user: AuthenticatedUser) {
+    return this.createOAuthTokens(user);
+  }
+
+  private createOAuthTokens(user: AuthenticatedUser) {
     const jwtPayload = {
       id: user.id,
       name: user.name,

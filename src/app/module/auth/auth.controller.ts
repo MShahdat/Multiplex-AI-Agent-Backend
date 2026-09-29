@@ -44,6 +44,7 @@ export class AuthController {
     });
   }
 
+  //& REGISTER
   @Post('/register')
   async create(@Body() payload: RegisterUserDto) {
 
@@ -54,6 +55,8 @@ export class AuthController {
     }
   }
 
+
+  //& EMAIL VERIFY
   @Post('/email-verify')
   async verifyEmail(
     @Body() payload: EmailVerifyDto,
@@ -75,6 +78,7 @@ export class AuthController {
   }
 
 
+  //& LOGIN
   @Post('/login')
   async loginUser(
     @Body() payload: LoginUserDto,
@@ -94,6 +98,7 @@ export class AuthController {
     }
   }
 
+  //& GET ME
   @Get('/me')
   @UseGuards(AuthGuard)
   async getMe(
@@ -107,17 +112,8 @@ export class AuthController {
     }
   }
 
-  @Get('/admin')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  async adminOnly(@CurrentUser() user: AuthenticatedUser) {
-    return {
-      data: user,
-      message: "admin only route"
-    }
-  }
 
-
+  //& TOKEN REFRESH
   @Post('/refresh-token')
   async refreshToken(
     @Req() req: Request,
@@ -141,6 +137,7 @@ export class AuthController {
   }
 
 
+  //& FORGOT PASSWORD OTP
   @Post('/forgot-password')
   async forgotPass(
     @Body() payload: ForgotPasswordDto
@@ -153,6 +150,7 @@ export class AuthController {
   }
 
 
+  //& RESET PASSWORD (NEW PASSWORD)
   @Post('/reset-password')
   async resetPassword(
     @Body() payload: ResetPasswordDto
@@ -166,13 +164,17 @@ export class AuthController {
   }
 
 
+  //& GOOGLE LOGIN
   @Get('/google')
-  googleLogin() { }
+  async googleLogin() {
 
+  }
+
+  //& CALLBACK
   @Get('/google/callback')
   async googleCallback(
     @Req() req: Request & { user?: AuthenticatedUser },
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     if (!req.user) {
       throw new UnauthorizedException('Google authentication failed');
@@ -188,6 +190,36 @@ export class AuthController {
       },
       message: "User Logged in successfully"
     }
+  }
+
+
+  //& GITHUB LOGIN
+  @Get('/github')
+  async githubLogin() {
+  }
+
+
+
+  //& CALLBACK (GITHUB)
+  @Get('/github/callback')
+  async githubCallback(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('GitHub authentication failed');
+    }
+
+    const tokens = await this.authService.loginWithGithub(req.user);
+    this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
+    return {
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      },
+      message: 'User logged in successfully',
+    };
   }
 
 

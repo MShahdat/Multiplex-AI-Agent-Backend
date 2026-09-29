@@ -21,5 +21,13 @@ export class AuthModule implements NestModule {
     consumer
       .apply(passport.authenticate('google', { session: false }))
       .forRoutes({ path: `${prefix}/auth/google/callback`, method: RequestMethod.GET });
+
+    consumer
+      .apply(passport.authenticate('github', { scope: ['user:email'] }))
+      .forRoutes({ path: `${prefix}/auth/github`, method: RequestMethod.GET });
+
+    consumer
+      .apply(passport.authenticate('github', { session: false }))
+      .forRoutes({ path: `${prefix}/auth/github/callback`, method: RequestMethod.GET });
   }
 }

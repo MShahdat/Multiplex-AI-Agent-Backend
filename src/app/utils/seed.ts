@@ -218,6 +218,5 @@ export const planProviderLimits = async () => {
       });
     }
   }
-  console.log('Limits ensured: FREE x free-only, PREMIUM_* x all');
 };
 
