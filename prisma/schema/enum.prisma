@@ -22,6 +22,7 @@ enum PlanType {
 }
 
 enum SubscriptionStatus {
+  DRAFT
   ACTIVE
   CANCELED
   EXPIRED
