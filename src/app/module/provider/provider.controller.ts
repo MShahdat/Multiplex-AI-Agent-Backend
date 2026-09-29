@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
 import { Role } from '../../../../generated/prisma/enums.js';
@@ -27,10 +27,11 @@ export class ProviderController {
   }
 
   @Get()
-  @UseGuards(AuthGuard)
-  async getAll() {
-
-    const res = await this.providerService.getModels()
+  // @UseGuards(AuthGuard)
+  async getAll(
+    @Query() query: Record<string, any>
+  ) {
+    const res = await this.providerService.getModels(query)
 
     return {
       data: res,

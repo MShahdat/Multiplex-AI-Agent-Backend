@@ -7,6 +7,9 @@ import { PaymentMethod, PaymentStatus, PlanType, SubscriptionStatus, Subscriptio
 import config from '../../config/index.js';
 import { randomUUID } from 'node:crypto';
 import { addMonths, addYears } from 'date-fns';
+import PDFDocument from "pdfkit";
+import { transporter } from '../../lib/nodemailer.js';
+import { generateInvoicePdf } from '../../utils/invoice.js';
 
 
 
@@ -213,6 +216,48 @@ export class SubscriptionService {
               currentPeriodEnd,
             }
           })
+
+          const plan = await tx.plan.update({
+            where: {
+              id: subscription.planId
+            },
+            data: {
+              planTemplateId: subscription.planTemplateId,
+            },
+            include: {
+              user: true
+            }
+          })
+
+          const pdfBuffer = await generateInvoicePdf({
+            invoiceNumber: `INV-${result.trxID}`,
+            customerName: plan.user.name,
+            customerEmail: plan.user.email,
+            planName: "Premium Plan",
+            billingCycle: subscription.type,
+            periodStart: subscription.currentPeriodStart,
+            periodEnd: subscription.currentPeriodEnd!,
+            amount: result.amount,
+            currency: "BDT",
+            paymentMethod: "bKash",
+            transactionId: result.trxID,
+            paidAt: result.paymentExecuteTime,
+          });
+
+
+          await transporter.sendMail({
+            from: config.smtp_sender,
+            to: plan.user.email,
+            subject:
+              "Your Subscription Payment Invoice - Multiplex AI Agent",
+            text: "Your payment is completed. Please find your invoice attached.",
+            attachments: [
+              {
+                filename: "invoice.pdf",
+                content: pdfBuffer,
+              },
+            ],
+          });
 
           return {
             result,

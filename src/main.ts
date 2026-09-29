@@ -8,7 +8,7 @@ import { ResponseInterceptor } from './app/common/interceptors/response.intercep
 import cookieParser from "cookie-parser";
 import passport from 'passport';
 import { freeTemplate, planProviderLimits, premiumTemplates, providers, seedTesterAdmin } from './app/utils/seed.js';
-import { deleteUserFromDB } from './app/lib/cron.js';
+import { deleteSubscriptionPaymentFromDB, deleteUserFromDB } from './app/lib/cron.js';
 
 
 const PORT = config.port || 5000;
@@ -46,12 +46,13 @@ async function bootstrap() {
 
     await seedTesterAdmin()
 
-    await deleteUserFromDB()
-
     await freeTemplate()
     await premiumTemplates()
     await providers()
     await planProviderLimits()
+
+    await deleteUserFromDB()
+    await deleteSubscriptionPaymentFromDB()
 
     await app.listen(PORT, () => {
       console.log(`server is running port ${PORT}`);

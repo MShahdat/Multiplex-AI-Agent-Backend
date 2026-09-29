@@ -1,9 +1,9 @@
-import { BadGatewayException, BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { MsgPromptDto, UpdateTitleDto } from './message.dto.js';
 import { prisma } from '../../lib/prisma.js';
 import type { AuthenticatedUser } from '../../interface/index.js';
 import { groqFallback } from '../../lib/groq.js';
-import { MessageStatus, PlanType } from '../../../../generated/prisma/enums.js';
+import { MessageStatus, PlanType, Role, SubscriptionStatus } from '../../../../generated/prisma/enums.js';
 
 @Injectable()
 export class MessageService {
@@ -22,6 +22,24 @@ export class MessageService {
 
     if (!isModel.isEnabled) {
       throw new BadRequestException('Model is disabled');
+    }
+
+    if (isModel.isPremium) {
+      const subscription = await prisma.subscription.findFirst({
+        where: {
+          userId: user.id,
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodEnd: { gt: new Date() },
+          planTemplate: {
+            is: { type: PlanType.PREMIUM },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!subscription && user.role === Role.USER) {
+        throw new ForbiddenException('An active premium subscription is required to use this model');
+      }
     }
 
     try {
