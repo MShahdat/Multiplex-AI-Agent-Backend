@@ -7,7 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './app/common/interceptors/response.interceptor.js';
 import cookieParser from "cookie-parser";
 import passport from 'passport';
-import { freeTemplate, planProviderLimits, premiumTemplates, providers, seedTesterAdmin } from './app/utils/seed.js';
+import { seedTesterAdmin } from './app/utils/seed.js';
 import { deleteSubscriptionPaymentFromDB, deleteUserFromDB } from './app/lib/cron.js';
 import { setupSwagger } from './app/docs/swagger.config.js';
 
@@ -50,11 +50,6 @@ async function bootstrap() {
     console.log('Connected to Redis successfully.');
 
     await seedTesterAdmin()
-
-    await freeTemplate()
-    await premiumTemplates()
-    await providers()
-    await planProviderLimits()
 
     await deleteUserFromDB()
     await deleteSubscriptionPaymentFromDB()

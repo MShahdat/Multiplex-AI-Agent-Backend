@@ -4,6 +4,7 @@ import { prefix } from '../../utils/global.prefix.js';
 import { MsgPromptDto, UpdateTitleDto } from './message.dto.js';
 import { MessageService } from './message.service.js';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
+import { OptionalAuthGuard } from '../../common/guard/optional-auth.guard.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Role } from '../../../../generated/prisma/enums.js';
@@ -18,19 +19,18 @@ export class MessageController {
 
   //& CREATE CHAT
   @Post()
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.USER)
+  @UseGuards(OptionalAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiCookieAuth('accessToken')
-  @ApiOperation({ summary: 'Send prompt to Groq (premium gate: ACTIVE PREMIUM for premium models)' })
+  @ApiOperation({ summary: 'Generate a reply with any free model; premium models require an active subscription' })
   @ApiBody({ type: MsgPromptDto })
   @ApiResponse({ status: 201, description: 'Chat created. Auto-titles new conversations (45 chars).' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 401, description: 'Authentication required for premium models' })
   @ApiResponse({ status: 403, description: 'Active premium subscription required' })
   @ApiResponse({ status: 404, description: 'Model not found' })
   async message(
     @Body() payload: MsgPromptDto,
-    @CurrentUser() user: AuthenticatedUser
+    @CurrentUser() user: AuthenticatedUser | undefined
   ) {
     const res = await this.messageService.createMsg(payload, user);
     return {

@@ -16,10 +16,6 @@ import type { Request, Response } from 'express';
 import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../interface/index.js';
-import { RolesGuard } from '../../common/guard/roles.guard.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
-import { Role } from '../../../../generated/prisma/enums.js';
-import config from '../../config/index.js';
 
 
 @ApiTags('Auth')

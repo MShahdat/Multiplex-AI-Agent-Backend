@@ -52,10 +52,6 @@ export class SubscriptionController {
   }
 
   @Get('/bkash/callback')
-  @ApiOperation({ summary: 'bKash callback — verifies payment, 302 redirect to frontend (not JSON envelope)' })
-  @ApiQuery({ name: 'paymentID', required: false, description: 'bKash paymentID' })
-  @ApiQuery({ name: 'status', required: false, description: 'success | failure | cancel' })
-  @ApiResponse({ status: 302, description: 'Redirects to FRONTEND_URL/dashboard/?status=success' })
   async bkashCallback(
     @Query() query: Record<string, any>,
     @Res() response: Response,
@@ -68,20 +64,22 @@ export class SubscriptionController {
 
 
   @Post('/webhook')
-  @ApiOperation({ summary: 'Stripe webhook (rawBody + stripe-signature, not JSON — Try-it-out will fail signature)' })
-  @ApiHeader({ name: 'stripe-signature', required: true, description: 'Stripe signature header' })
-  @ApiResponse({ status: 201, description: 'Stripe webhook received: { data: { received: true } }' })
-  @ApiResponse({ status: 400, description: 'Missing Stripe signature or raw request body' })
   async stripeWebhook(
     @Headers('stripe-signature') signature: string | undefined,
     @Req() request: RawBodyRequest<Request>,
   ) {
+
     if (!signature || !request.rawBody) {
       throw new BadRequestException('Missing Stripe signature or raw request body');
     }
 
     await this.subscriptionService.stripeWebhook(signature, request.rawBody);
-    return { data: { received: true }, message: 'Stripe webhook received' };
+    return {
+      data: {
+        received: true
+      },
+      message: 'Stripe webhook received'
+    };
   }
 
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { prisma } from '../../lib/prisma.js';
-import { PaymentStatus, SubscriptionStatus } from '../../../../generated/prisma/enums.js';
+import { PaymentStatus, Role, SubscriptionStatus } from '../../../../generated/prisma/enums.js';
 
 @Injectable()
 export class AnalyticsService {
@@ -10,9 +10,16 @@ export class AnalyticsService {
   //& ADMIN ANALYTICS
   async analytics() {
 
+    const totalPlans = await prisma.planTemplate.count({
+      where: {
+        isActive: true
+      }
+    })
+
     const totalUsers = await prisma.user.count({
       where: {
-        isDeleted: false
+        isDeleted: false,
+        role: Role.USER
       }
     });
 
@@ -79,6 +86,7 @@ export class AnalyticsService {
     });
 
     return {
+      totalPlans,
       totalUsers,
       totalAiProviders,
       totalActiveProviders,

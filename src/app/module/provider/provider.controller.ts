@@ -4,7 +4,7 @@ import { AuthGuard } from '../../common/guard/auth.guard.js';
 import { RolesGuard } from '../../common/guard/roles.guard.js';
 import { Role } from '../../../../generated/prisma/enums.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { UpdateProviderDto } from './provider.dto.js';
+import { CreateProviderDto, UpdateProviderDto } from './provider.dto.js';
 import { ProviderService } from './provider.service.js';
 import { prefix } from '../../utils/global.prefix.js';
 
@@ -14,6 +14,40 @@ export class ProviderController {
 
   constructor(private readonly providerService: ProviderService) { }
 
+  @Post()
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Create provider from preset whitelist with manual fields (ADMIN)' })
+  async create(
+    @Body() payload: CreateProviderDto
+  ) {
+    const res = await this.providerService.create(payload)
+    return {
+      data: res,
+      message: 'Provider created successfully'
+    };
+  }
+
+
+  @Patch('/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiCookieAuth('accessToken')
+  @ApiOperation({ summary: 'Edit provider flags / rotate key (ADMIN)' })
+  async patchDetails(
+    @Param('id') id: string,
+    @Body() payload: UpdateProviderDto) {
+
+    const res = await this.providerService.updateModel(payload, id)
+
+    return {
+      data: res,
+      message: 'Provider updated successfully'
+    };
+  }
 
   //& GET ALL MODEL (ADMIN)
   @Get('/all-model')
@@ -52,53 +86,5 @@ export class ProviderController {
       message: res.length !== 0 ? "All model retrive successfully" : "Model not found!"
     }
   }
-
-
-  //& UPDATE (ADMIN)
-  @Put('/:id')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth('access-token')
-  @ApiCookieAuth('accessToken')
-  @ApiOperation({ summary: 'Enable model (ADMIN only)' })
-  @ApiParam({ name: 'id', description: 'Provider ID' })
-  @ApiResponse({ status: 200, description: 'Model Enabled successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
-  @ApiResponse({ status: 404, description: 'Model not found' })
-  async update(
-    @Param('id') id: string
-  ) {
-
-    await this.providerService.updateModel(id)
-
-    return {
-      data: null,
-      message: "Model Enabled successfully"
-    }
-  }
-
-  //& DISABLE (ADMIN)
-  @Patch('/:id')
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth('access-token')
-  @ApiCookieAuth('accessToken')
-  @ApiOperation({ summary: 'Disable model (ADMIN only)' })
-  @ApiParam({ name: 'id', description: 'Provider ID' })
-  @ApiResponse({ status: 200, description: 'Model Disabled successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden: ADMIN only' })
-  @ApiResponse({ status: 404, description: 'Model not found' })
-  async disableModel(
-    @Param('id') id: string
-  ) {
-
-    await this.providerService.disableModel(id)
-
-    return {
-      data: null,
-      message: "Model Disabled successfully"
-    }
-  }
-
 
 }

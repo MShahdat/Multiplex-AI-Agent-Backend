@@ -7,10 +7,13 @@ import { MessageModule } from './app/module/message/message.module.js';
 import { SubscriptionModule } from './app/module/subscription/subscription.module.js';
 import { AnalyticsModule } from './app/module/analytics/analytics.module.js';
 import { LoggerModule } from './app/module/logger/logger.module.js';
+import { PaymentModule } from './app/module/payment/payment.module.js';
+import { PlanTemplateModule } from './app/module/plan-template/plan-template.module.js';
+import { PlanLimitModule } from './app/module/plan-limit/plan-limit.module.js';
 
 
 @Module({
   controllers: [AppController],
-  imports: [AuthModule, UserModule, ProviderModule, MessageModule, SubscriptionModule, AnalyticsModule, LoggerModule],
+  imports: [AuthModule, UserModule, ProviderModule, MessageModule, SubscriptionModule, AnalyticsModule, LoggerModule, PaymentModule, PlanTemplateModule, PlanLimitModule],
 })
 export class AppModule { }

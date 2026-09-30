@@ -257,7 +257,7 @@ export const generateInvoicePdf = (data: InvoiceData): Promise<Buffer> => {
       .text("PAYMENT DETAILS", left, y, { lineBreak: false });
 
     y += 20;
-    const boxHeight = 96;
+    const boxHeight = 120;
     doc
       .roundedRect(left, y, contentWidth, boxHeight, 6)
       .lineWidth(1)

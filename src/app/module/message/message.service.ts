@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { MsgPromptDto, UpdateTitleDto } from './message.dto.js';
 import { prisma } from '../../lib/prisma.js';
 import type { AuthenticatedUser } from '../../interface/index.js';
@@ -9,7 +9,7 @@ import { MessageStatus, PlanType, Role, SubscriptionStatus } from '../../../../g
 export class MessageService {
 
   //& CREATE CHAT
-  async createMsg(payload: MsgPromptDto, user: AuthenticatedUser) {
+  async createMsg(payload: MsgPromptDto, user?: AuthenticatedUser) {
     const isModel = await prisma.aiProvider.findUnique({
       where: {
         id: payload.providerId,
@@ -24,7 +24,29 @@ export class MessageService {
       throw new BadRequestException('Model is disabled');
     }
 
+    if (payload.conversationId && !user) {
+      throw new UnauthorizedException('Sign in to continue an existing conversation');
+    }
+
+    if (payload.conversationId && user) {
+      const conversation = await prisma.conversation.findUnique({
+        where: {
+          id: payload.conversationId,
+          userId: user.id,
+        },
+        select: { id: true },
+      });
+
+      if (!conversation) {
+        throw new NotFoundException('Conversation not found');
+      }
+    }
+
     if (isModel.isPremium) {
+      if (!user) {
+        throw new UnauthorizedException('Sign in to use premium models');
+      }
+
       const subscription = await prisma.subscription.findFirst({
         where: {
           userId: user.id,
@@ -57,6 +79,20 @@ export class MessageService {
       if (!payload.conversationId) {
         const cleanPrompt = payload.prompt.replace(/[\n\r]+/g, ' ').trim();
         title = cleanPrompt.length > 45 ? `${cleanPrompt.substring(0, 45)}...` : cleanPrompt;
+      }
+
+      if (!user) {
+        return {
+          model: isModel.model,
+          message: {
+            prompt: payload.prompt,
+            content: msg.choices[0].message.content || msg.choices[0].message.reasoning,
+            status: MessageStatus.COMPLETED,
+            promptTokens: msg.usage?.prompt_tokens,
+            completionTokens: msg.usage?.completion_tokens,
+            totalTokens: msg.usage?.total_tokens
+          },
+        };
       }
 
       const transactionRes = await prisma.$transaction(

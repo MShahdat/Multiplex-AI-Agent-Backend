@@ -45,5 +45,16 @@ export function setupSwagger(app: INestApplication): void {
       operationsSorter: 'alpha',
     },
     customSiteTitle: `${config.app_name ?? 'Multiplex Agent'} - API Docs`,
+    // Serve Swagger UI assets from CDN so docs work on Vercel serverless,
+    // where express.static(swagger-ui-dist) files are not bundled (404 -> blank page).
+    // Pinned to installed swagger-ui-dist version to avoid UI/spec mismatch.
+    customCssUrl:
+      'https://unpkg.com/swagger-ui-dist@5.33.0/swagger-ui.css',
+    customJs: [
+      'https://unpkg.com/swagger-ui-dist@5.33.0/swagger-ui-bundle.js',
+      'https://unpkg.com/swagger-ui-dist@5.33.0/swagger-ui-standalone-preset.js',
+    ],
+    customfavIcon:
+      'https://unpkg.com/swagger-ui-dist@5.33.0/favicon-32x32.png',
   });
 }

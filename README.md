@@ -19,7 +19,7 @@ Premium models are unlocked through Stripe or bKash subscriptions, with automati
 - Email/OTP registration, JWT auth with refresh, Google and GitHub OAuth
 - Multi-model AI chat with premium gating, auto-titled conversations, and token usage tracking
 - Stripe and bKash subscriptions (monthly, half-yearly, yearly) with PDF invoicing
-- Admin tools: user and model management, analytics
+- Admin tools: user and model management, plan templates + per-model limits, subscriptions, payments, analytics
 - Request logging, uniform response format `{ success, message, data, meta? }`, startup seeding, and scheduled cleanup jobs
 
 ## Tech Stack
@@ -44,20 +44,23 @@ Premium models are unlocked through Stripe or bKash subscriptions, with automati
 ```text
 src/
   main.ts                  # bootstrap: CORS, ValidationPipe, Interceptor, Prisma+Redis, seed, cron, listen
-  app.module.ts            # Auth, User, Provider, Message, Subscription, Analytics, Logger
+  app.module.ts            # Auth, User, Provider, Message, Subscription, Payment, PlanTemplate, PlanLimit, Analytics, Logger
   app.controller.ts        # GET /
   app/
     config/index.ts        # centralized env
     utils/                 # global.prefix, jwt, invoice (PDFKit), seed
     lib/                   # prisma, redis, groq, stripe, cloudinary, nodemailer, passport, bkash, cron, crypto
-    common/                # AuthGuard, RolesGuard, @Roles / @CurrentUser, ResponseInterceptor
+    common/                # AuthGuard, OptionalAuthGuard, RolesGuard, @Roles / @CurrentUser, ResponseInterceptor
     template/              # verification.otp.ejs, forgot.password.opt.ejs, reset.Password.ejs
     module/
       auth/                # register, verify, login, me, refresh, forgot, reset, google, github
       user/                # profile-image upload, soft-delete
-      provider/            # AI models list / enable / disable
+      provider/            # AI models create / update / all-model / list
       message/             # prompt -> Groq, conversations CRUD / archive
       subscription/        # checkout (Stripe/bKash), webhook, callback, list / my
+      payment/             # payments all / my
+      plan-template/       # pricing templates list / get / create / update
+      plan-limit/          # per-model quotas list / get / create / upsert
       analytics/           # admin aggregates
       logger/              # RequestLoggerMiddleware (global *)
 api/[...path].ts           # Vercel serverless entry (cached app.init(), no seed/cron/listen)
@@ -78,9 +81,9 @@ vercel.json                # buildCommand npm run build, maxDuration 60
 | Roles | `@Roles(...Role[])` + `RolesGuard` (401 no-user, 403 mismatch) |
 | Cookies | `httpOnly, secure=production, sameSite none|lax, access 30m, refresh 7d, path /` |
 
-Access matrix: `ADMIN` only → user delete, provider all / enable / disable, subscription all, analytics. `USER` only → subscription create. `ADMIN+USER` → message all, subscription my. Authenticated → profile-image, me. Public → register / login / verify / forgot / reset, OAuth, `GET /provider`, bKash callback, Stripe webhook, `GET /`.
+Access matrix: `ADMIN` only → user delete, provider create / update / all-model, plan-template create / update, plan-limits all, subscription all, payment all, analytics. `USER` only → subscription create, payment my. `ADMIN+USER` → message my-conversation / single / title / archive, subscription my. Authenticated → profile-image, me. `OptionalAuthGuard` → message POST (guest free-model allowed; auth required for premium / conversationId). Public → register / login / verify / forgot / reset, OAuth, `GET /provider`, `GET /plan-template`, bKash callback, Stripe webhook, `GET /`.
 
-## API Endpoints — Complete (30)
+## API Endpoints — Complete (40)
 
 > All responses wrapped by `ResponseInterceptor`: `{ success: true, message, data, meta? }`.
 > Validation: `whitelist + forbidNonWhitelisted + transform`.
@@ -118,16 +121,16 @@ Access matrix: `ADMIN` only → user delete, provider all / enable / disable, su
 
 | # | Method | Path | Auth | Request Body / Payload | Description |
 |---|--------|------|------|------------------------|-------------|
-| 15 | GET | `/api/v1/provider/all-model` | `AuthGuard + ADMIN` | — | Admin list all providers incl. disabled / premium |
-| 16 | GET | `/api/v1/provider` | Public | — (`?query` passthrough, optional) | Public list enabled models |
-| 17 | PUT | `/api/v1/provider/:id` | `AuthGuard + ADMIN` | — (`:id` path param only; `UpdateProviderDto{isEnabled?}` defined but unused) | Enable model |
-| 18 | PATCH | `/api/v1/provider/:id` | `AuthGuard + ADMIN` | — (`:id` path param only) | Disable model |
+| 15 | POST | `/api/v1/provider` | `AuthGuard + ADMIN` | `{"model": "string, must match MODEL_ALLOWED preset", "name": "string", "type": "GROQ", "isPremium?": "boolean", "isDefault?": "boolean"}` | Create provider from preset whitelist, encrypt API key |
+| 16 | PATCH | `/api/v1/provider/:id` | `AuthGuard + ADMIN` | `{"name?": "string", "isPremium?": "boolean", "isEnabled?": "boolean", "isDefault?": "boolean"}` (`UpdateProviderDto`) | Edit provider flags / rotate key |
+| 17 | GET | `/api/v1/provider/all-model` | `AuthGuard + ADMIN` | — | Admin list all providers incl. disabled / premium |
+| 18 | GET | `/api/v1/provider` | Public | — (`?search, ?isPremium` passthrough, optional) | Public list enabled models |
 
 ### 5. Message / Chat — `api/v1/message` (6)
 
 | # | Method | Path | Auth | Request Body / Payload | Description |
 |---|--------|------|------|------------------------|-------------|
-| 19 | POST | `/api/v1/message` | `AuthGuard + ADMIN,USER` | `{"providerId": "string, required", "prompt": "string, required, max 2000", "conversationId?": "string, optional"}` | Send prompt to Groq; premium gate requires `ACTIVE PREMIUM`; creates conversation (auto-title 45 chars) + message with usage |
+| 19 | POST | `/api/v1/message` | `OptionalAuthGuard` (guest allowed) | `{"providerId": "string, required", "prompt": "string, required, max 2000", "conversationId?": "string, optional (auth required)"}` | Send prompt to Groq; free models work as guest, premium gate requires `ACTIVE PREMIUM`; creates conversation (auto-title 45 chars) + message with usage |
 | 20 | GET | `/api/v1/message/my-conversation` | `AuthGuard + ADMIN,USER` | — | List own conversations with messages |
 | 21 | GET | `/api/v1/message/:id` | `AuthGuard + ADMIN,USER` | — (`:id` path param) | Get single conversation (ownership-checked) |
 | 22 | PUT | `/api/v1/message/:id` | `AuthGuard + ADMIN,USER` | `{"title?": "string, optional"}` (`UpdateTitleDto`) | Update conversation title |
@@ -150,11 +153,36 @@ Access matrix: `ADMIN` only → user delete, provider all / enable / disable, su
 |---|--------|------|------|------------------------|-------------|
 | 30 | GET | `/api/v1/analytics` | `AuthGuard + ADMIN` | — | Dashboard aggregates: `totalUsers, totalAiProviders/active/premium, totalSubscription, totalActiveSubscriver, totalPayment(PAID), totalRevenue, currentMonthlyRevenue` |
 
+### 8. Plan Template — `api/v1/plan-template` (4)
+
+| # | Method | Path | Auth | Request Body / Payload | Description |
+|---|--------|------|------|------------------------|-------------|
+| 31 | GET | `/api/v1/plan-template` | Public | — | Public pricing list (`isActive:true` ordered by type, billingCycle) |
+| 32 | GET | `/api/v1/plan-template/:id` | Public | — (`:id` path param) | Get single active template or 404 |
+| 33 | POST | `/api/v1/plan-template` | `AuthGuard + ADMIN` | `{"code": "FREE \| PREMIUM_MONTHLY \| PREMIUM_HALF_YEARLY \| PREMIUM_YEARLY", "type": "FREE \| PREMIUM", "price": "number, min 0 (0 if FREE)", "billingCycle?": "MONTHLY \| HALF_YEARLY \| YEARLY (required if PREMIUM)", "isActive?": "boolean"}` | Create template; 409 if code exists |
+| 34 | PATCH | `/api/v1/plan-template/:id` | `AuthGuard + ADMIN` | `{"price?": "number", "isActive?": "boolean", "code?": "FREE \| PREMIUM_* "}` (at least one field) | Update price / isActive / code |
+
+### 9. Plan Limits — `api/v1/plan-limits` (4)
+
+| # | Method | Path | Auth | Request Body / Payload | Description |
+|---|--------|------|------|------------------------|-------------|
+| 35 | GET | `/api/v1/plan-limits` | `AuthGuard + ADMIN` | — (`?search, ?planTemplateId, ?aiProviderId`) | List limit rows paginated + `meta{total,page,limit,totalPages}` |
+| 36 | GET | `/api/v1/plan-limits/:id` | `AuthGuard + ADMIN` | — (`:id` path param) | Get single limit row |
+| 37 | POST | `/api/v1/plan-limits` | `AuthGuard + ADMIN` | `{"planTemplateId": "UUID", "aiProviderId": "UUID", "requestPerMinute?": "int", "requestPerDay?": "int", "tokenPerMinute?": "int", "tokenPerDay?": "int", "maxTokensPerRequest?": "int"}` | Create limit row; 404 if template/provider missing, 409 if pair exists |
+| 38 | PUT | `/api/v1/plan-limits/update` | `AuthGuard + ADMIN` | Same `CreatePlanLimitDto` as above | Idempotent create-or-replace limit row |
+
+### 10. Payment — `api/v1/payment` (2)
+
+| # | Method | Path | Auth | Request Body / Payload | Description |
+|---|--------|------|------|------------------------|-------------|
+| 39 | GET | `/api/v1/payment/all` | `AuthGuard + ADMIN` | — (`?search,page,limit,status:PENDING\|PAID\|FAILED\|CANCELLED,method:CARD\|BKASH,sortBy,sortOrder`) | Admin paginated list + `meta{total,page,limit,totalPages}` |
+| 40 | GET | `/api/v1/payment/my` | `AuthGuard + USER` | — (same minus `status`, plus `CurrentUser()`: `?search,page,limit,method,sortBy,sortOrder`) | Own payments paginated + `meta` |
+
 ## Environment Variables
 
 | Variable | Used for |
 |----------|----------|
-| `NODE_ENV`, `PORT` (default 5000), `APP_NAME` | runtime / cookies / listen |
+| `NODE_ENV`, `PORT` (default 5000), `APP_NAME`, `SWAGGER_ENABLE` | runtime / cookies / listen / Swagger `/api/docs` |
 | `DATABASE_URL` | Prisma Postgres + migrations |
 | `BACKEND_URL`, `FRONTEND_URL` | CORS origin, callbacks, bKash redirect |
 | `BCRYPT_SALT_ROUNDS` | password hashing |

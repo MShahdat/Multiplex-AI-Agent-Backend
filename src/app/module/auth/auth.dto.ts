@@ -72,8 +72,17 @@ export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
   otp: string;
-  @ApiProperty({ example: 'NewPass@1234' })
+  @ApiProperty({
+    example: 'Pass@1234',
+    minLength: 8,
+    description: 'min 8 + upper + lower + number + special',
+  })
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @Matches(/[A-Z]/, { message: 'Password must contain an uppercase letter' })
+  @Matches(/[a-z]/, { message: 'Password must contain a lowercase letter' })
+  @Matches(/[0-9]/, { message: 'Password must contain a number' })
+  @Matches(/[^A-Za-z0-9]/, { message: 'Password must contain a special character' })
   newPassword: string
 }

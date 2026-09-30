@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { prefix } from './app/utils/global.prefix.js';
 
 @ApiTags('System')
 @Controller()

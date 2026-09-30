@@ -54,6 +54,8 @@ export class SubscriptionService {
       }
     })
 
+
+
     if (!planTemplate) {
       throw new BadGatewayException('This subscription type not exist')
     }
@@ -66,7 +68,7 @@ export class SubscriptionService {
     const amount = premiumPlan.price.toString()
 
 
-    const merchantInvoiceNumber = `SUB-${randomUUID()}`;
+    const merchantInvoiceNumber = randomUUID();
 
     //* create bkash payment url
     const createPayment = await fetch(
@@ -174,6 +176,16 @@ export class SubscriptionService {
           );
           const result = await executePayment.json();
           console.log("execute payment", result);
+
+          const pay = await tx.payment.findUnique({
+            where: {
+              bKashPaymentId: paymentID
+            }
+          })
+
+          if (result.amount !== pay?.amount) {
+            throw new BadGatewayException('something went wrong')
+          }
 
           const now = new Date()
           let currentPeriodEnd: Date;
@@ -388,10 +400,10 @@ export class SubscriptionService {
       endpointSecret
     );
 
-    console.log('event.............................', event)
+    // console.log('event.............................', event)
     switch (event.type) {
       case "checkout.session.completed":
-        console.log('seccess...')
+        // console.log('seccess...')
         await paymentSuccess(event.data.object as Stripe.Checkout.Session);
         break;
 

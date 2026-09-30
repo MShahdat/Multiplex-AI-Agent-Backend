@@ -10,18 +10,13 @@ import config from "../../config/index.js";
 
 export const paymentSuccess = async (session: Stripe.Checkout.Session) => {
   try {
-    console.log('webhook session ', session)
-    console.log('payment method config details details =========', session.payment_method_configuration_details)
-    console.log('payemnt method collection', session.payment_method_collection)
+    // console.log('webhook session ', session)
 
     const subscriptionId = session.metadata?.subscriptionId as string
     const paymentId = session.metadata?.paymentId as string
     const paymentIntentId = session.payment_intent as string
 
-    const paymentIntent =
-      await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    const transactionRes = await prisma.$transaction(
+    await prisma.$transaction(
       async (tx) => {
         const now = new Date()
         let currentPeriodEnd: Date;
@@ -33,6 +28,7 @@ export const paymentSuccess = async (session: Stripe.Checkout.Session) => {
           data: {
             status: "PAID",
             paidAt: new Date(),
+            stripeSubscriptionId: paymentIntentId
           },
         });
 
@@ -108,6 +104,10 @@ export const paymentSuccess = async (session: Stripe.Checkout.Session) => {
           ],
         });
 
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000
       });
 
     return
